@@ -1,10 +1,14 @@
 # K-Craft Piano / Folia edition
 
-[演奏画面](https://kcraft-piano.kaisuta-works.workers.dev/) · [JAR](https://kcraft-piano.kaisuta-works.workers.dev/downloads/kcraft-piano-folia-2.3.0.jar) · [リソースパック](https://kcraft-piano.kaisuta-works.workers.dev/downloads/kcraft-piano-pack.zip)
+[演奏画面](https://kcraft-piano.kaisuta-works.workers.dev/) · [JAR](https://kcraft-piano.kaisuta-works.workers.dev/downloads/kcraft-piano-folia-2.3.1.jar) · [リソースパック](https://kcraft-piano.kaisuta-works.workers.dev/downloads/kcraft-piano-pack.zip)
 
 [jwdeveloper/JW_Piano](https://github.com/jwdeveloper/JW_Piano) のFolia向けフォーク。原版のピアノモデル・テクスチャ・88鍵の音源・鍵盤配置を継承し、日本語のゲーム内操作とブラウザ演奏を追加しました。
 
 原版の公開終了したFluentAPIには依存しません。実行するコードは `folia/`、Web画面とCloudflare中継は `web/` です。ルートの `src/` と `pom.upstream.xml` は原版の履歴・参照用として残しています。ルートの `mvn package` でもFolia版をビルドできます。原版の説明は [README.upstream.md](README.upstream.md) です。
+
+## 2.3.1の修正
+
+短い打鍵の押下と解放が同じ更新内に重なっても、上昇する残像が消えないようにしました。通常40打鍵、即時解放5打鍵の全件と、上限128個を含む合計173個の削除を確認しています。
 
 ## 2.3.0の変更
 
@@ -68,7 +72,7 @@ Chromiumでの打鍵イベント → AudioBufferSourceNode.start呼出しは中�
 
 - Paper/Folia 1.21.4以降向けのAPIでビルド。実機検証はFolia 26.2。Minecraft本体が要求するJavaを使用してください（26.2はJava 25）。
 - **2.1.0以降はPacketEvents不要です。** 既存のサーバー接続に音声パケットだけを送信します。高速経路はFolia 26.2で検証済み。対象APIが見つからない版では標準のFoliaスケジューラ経由に切り替えます。
-- `kcraft-piano-folia-2.3.0.jar` を `plugins/` へ配置します。2.1.0は接続中プレイヤーがいる状態でのPlugMan入れ替えを検証しています。サーバー全体の再起動は運営者の許可を得てから行ってください。
+- `kcraft-piano-folia-2.3.1.jar` を `plugins/` へ配置します。2.1.0は接続中プレイヤーがいる状態でのPlugMan入れ替えを検証しています。サーバー全体の再起動は運営者の許可を得てから行ってください。
 
 `plugins/KCraftPiano/config.yml`:
 

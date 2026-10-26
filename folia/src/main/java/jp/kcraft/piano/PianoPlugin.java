@@ -226,6 +226,7 @@ public final class PianoPlugin extends JavaPlugin implements Listener, CommandEx
         final boolean[] pressed=new boolean[88];
         final AtomicReference<Session> active=new AtomicReference<>();
         final AtomicIntegerArray nextAnimation=new AtomicIntegerArray(88);
+        final ArrayBlockingQueue<Integer> nextFlights=new ArrayBlockingQueue<>(128);
         final AtomicBoolean animationScheduled=new AtomicBoolean();
         volatile ItemDisplay body; final List<ItemDisplay> models=new CopyOnWriteArrayList<>();
         final Set<Long> chunks=ConcurrentHashMap.newKeySet();
@@ -269,10 +270,9 @@ public final class PianoPlugin extends JavaPlugin implements Listener, CommandEx
             double a=Math.toRadians(origin.getYaw()),c=Math.cos(a),v=Math.sin(a),x=eye.getX()-origin.getX(),z=eye.getZ()-origin.getZ();
             return geometry.ray(c*x+v*z,eye.getY()-origin.getY(),-v*x+c*z,c*direction.getX()+v*direction.getZ(),direction.getY(),-v*direction.getX()+c*direction.getZ(),6);
         }
-        void note(int note,int velocity,UUID performer){if(removed||note<21||note>108)return;animate(note,velocity);if(realtime!=null)realtime.handle(voice,0,note,velocity,volume,performer);else soundFallback(note,velocity,performer);}
+        void note(int note,int velocity,UUID performer){if(removed||note<21||note>108)return;animate(note,velocity);if(velocity>0)fly(note-21);if(realtime!=null)realtime.handle(voice,0,note,velocity,volume,performer);else soundFallback(note,velocity,performer);}
         void animate(int note,int velocity){
             if(removed)return;int i=note-21;pressed[i]=velocity>0;
-            if(velocity>0)fly(i);
             ItemDisplay key=keys[i];if(key==null)return;boolean black=geometry.black[i];
             ItemStack stack=item(black?(velocity>0?167076:167075):(velocity>0?167078:167077),velocity>0?Color.fromRGB(76,151,220):black?Color.fromRGB(22,22,22):Color.WHITE);
             entity(key,()->key.setItemStack(stack));
@@ -311,7 +311,7 @@ public final class PianoPlugin extends JavaPlugin implements Listener, CommandEx
                 }catch(ReflectiveOperationException error){getLogger().warning("Seat failed: "+error);player.sendMessage("着席できませんでした。");}
             });});
         }
-        void queueAnimation(int note,int velocity){nextAnimation.set(note-21,velocity);if(animationScheduled.compareAndSet(false,true))at(this,()->{animationScheduled.set(false);for(int i=0;i<88;i++){int v=nextAnimation.getAndSet(i,-1);if(v>=0)animate(i+21,v);}});}
+        void queueAnimation(int note,int velocity){if(velocity>0)nextFlights.offer(note-21);nextAnimation.set(note-21,velocity);if(animationScheduled.compareAndSet(false,true))at(this,()->{animationScheduled.set(false);for(int i=0;i<88;i++){int v=nextAnimation.getAndSet(i,-1);if(v>=0)animate(i+21,v);}for(int n=0;n<128;n++){Integer i=nextFlights.poll();if(i==null)break;fly(i);}});}
         void soundFallback(int note,int velocity,UUID performer){
             // Send each recipient's sound on that recipient's entity owner thread.
             // No global-region task and no unbounded note queue.

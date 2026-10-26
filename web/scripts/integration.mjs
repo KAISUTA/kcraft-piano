@@ -66,6 +66,13 @@ const result={timestamp:new Date().toISOString(),minecraft:'Folia 26.2',acks,rou
 result.observerSoundPackets=sounds;result.observerSoundPacketNames=[...soundNames];result.customPianoNoteOns=customNotes;result.customPianoStops=customStops;assert.ok(sounds>=80,'Nearby listener must receive both sound and stop packets');
 assert.equal(customNotes,40,'Listener must receive all 40 custom piano note-on packets');
 if(process.env.PIANO_EXPECT_SELF_AUDIO==='1'){assert.equal(performerNotes,40,'Performer must hear all 40 notes in Minecraft');assert.equal(performerStops,40,'Performer must receive all 40 note stops');result.performerNoteOns=performerNotes;result.performerStops=performerStops;}
+if(process.env.PIANO_FEATURES230==='1'){
+  await wait(2200);assert.equal(rising.size,40,'Every normal note must create a rising key');
+  const previous=rising.size;
+  for(const n of [60,61,64,67,72]){send(0,n,100);send(0,n,0);}
+  await wait(2300);assert.equal(rising.size-previous,5,'Same-tick note on/off must preserve every rising key');
+  result.shortNoteRisingKeys=rising.size-previous;
+}
 await wait(1500);const before=acks;
 for(let i=0;i<250;i++){send(0,21+i%88,100);send(0,21+i%88,0);}
 for(let i=0;i<100&&acks<before+500;i++)await wait(50);
