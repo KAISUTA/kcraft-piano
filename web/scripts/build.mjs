@@ -1,0 +1,12 @@
+import { build } from 'esbuild';
+import { mkdir,copyFile,readdir,writeFile,readFile } from 'node:fs/promises';
+import path from 'node:path';
+await build({entryPoints:['src/app.js'],bundle:true,minify:true,format:'esm',outfile:'public/app.js',legalComments:'linked'});
+await mkdir('public/samples',{recursive:true});
+for(let n=21;n<=108;n++)await copyFile(`../pianopack/assets/minecraft/sounds/soma/1/c/${n}.ogg`,`public/samples/${n}.ogg`);
+await copyFile('../license.txt','public/JW-Piano-license.txt');
+let licenses='Third-party software notices\n\n';
+for(const [name,file]of[['@tonejs/midi','LICENSE.md'],['midi-file','LICENSE.md'],['array-flatten','LICENSE']])licenses+=name+'\n'+await readFile(`node_modules/${name}/${file}`,'utf8')+'\n\n';
+await writeFile('public/app.js.LEGAL.txt',licenses);
+await writeFile('public/_headers',`/*\n  Referrer-Policy: no-referrer\n  X-Content-Type-Options: nosniff\n  Permissions-Policy: midi=(self)\n  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; media-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'\n/samples/*\n  Cache-Control: public, max-age=31536000, immutable\n/downloads/*\n  Cache-Control: public, max-age=3600\n`);
+console.log('Web build complete: 88 preloaded upstream piano samples.');

@@ -1,0 +1,45 @@
+import { chromium } from 'playwright';
+import {readFile,writeFile,mkdir} from 'node:fs/promises';
+import {createRequire} from 'node:module';
+import assert from 'node:assert/strict';
+const require=createRequire(import.meta.url),{Midi}=require('@tonejs/midi');
+const base='https://kcraft-piano.kaisuta-works.workers.dev';
+const session=JSON.parse(await readFile('../.local/test-session.json','utf8'));
+const browser=await chromium.launch({executablePath:process.env.PIANO_CHROME||'C:/Users/User/AppData/Local/ms-playwright/chromium-1243/chrome-win64/chrome.exe',headless:true});
+const page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[];
+page.on('pageerror',e=>errors.push(e.message));
+await page.addInitScript(()=>{
+  window.__starts=[];window.__downs=[];const original=AudioBufferSourceNode.prototype.start;
+  AudioBufferSourceNode.prototype.start=function(...args){window.__starts.push(performance.now());return original.apply(this,args);};
+  window.addEventListener('keydown',e=>{if(e.code==='KeyA')window.__downs.push(performance.now());},true);
+  const Native=window.AudioContext;window.AudioContext=new Proxy(Native,{construct(target,args){const ctx=new target(...args);window.__audioCtx=ctx;const gain=ctx.createGain.bind(ctx);ctx.createGain=()=>{const node=gain();if(!window.__analyser){window.__analyser=ctx.createAnalyser();node.connect(window.__analyser);}return node;};return ctx;}});
+});
+await page.goto(`${base}/#session=${session.token}`);
+await page.waitForFunction(()=>document.querySelector('#connection').textContent==='Minecraft 接続済み',null,{timeout:15000});
+await page.getByRole('button',{name:'音を有効にする'}).click();
+await page.waitForFunction(()=>document.querySelector('#start').textContent==='音声 有効',null,{timeout:45000});
+await page.locator('#start').blur();
+await page.keyboard.down('a');await page.waitForTimeout(100);
+assert.equal(await page.locator('.key.active').count(),1);
+const amplitude=await page.evaluate(()=>{const a=window.__analyser,data=new Float32Array(a.fftSize);a.getFloatTimeDomainData(data);return Math.max(...data.map(Math.abs));});
+assert.ok(amplitude>0.001,'Real upstream sample must render non-silent audio');
+await page.keyboard.up('a');await page.waitForTimeout(80);assert.equal(await page.locator('.key.active').count(),0);
+for(let i=0;i<20;i++){await page.keyboard.down('a');await page.keyboard.up('a');await page.waitForTimeout(10);}
+await page.keyboard.down('Space');await page.keyboard.down('a');await page.keyboard.up('a');
+assert.equal(await page.locator('#pedal-led').getAttribute('class'),'on');await page.keyboard.up('Space');
+const midi=new Midi();const track=midi.addTrack();track.addNote({midi:60,time:0,duration:.3,velocity:.8});track.addNote({midi:64,time:.35,duration:.25,velocity:.8});
+await page.locator('#file').setInputFiles({name:'verification.mid',mimeType:'audio/midi',buffer:Buffer.from(midi.toArray())});
+await page.waitForFunction(()=>!document.querySelector('#play').disabled);
+await page.getByRole('button',{name:'再生',exact:true}).click();await page.waitForTimeout(900);
+assert.equal(await page.locator('#play').textContent(),'再生');
+await page.keyboard.down('a');await page.getByRole('button',{name:'すべて消音'}).click();await page.waitForTimeout(50);assert.equal(await page.locator('.key.active').count(),0);await page.keyboard.up('a');
+const timing=await page.evaluate(()=>{const d=window.__downs,s=window.__starts;const values=d.map(t=>s.find(x=>x>=t)-t).filter(x=>Number.isFinite(x));values.sort((a,b)=>a-b);return {count:values.length,min:values[0],p50:values[Math.floor(values.length*.5)],p95:values[Math.floor(values.length*.95)],baseLatency:window.__audioCtx.baseLatency,outputLatency:window.__audioCtx.outputLatency};});
+await page.waitForFunction(()=>document.querySelector('#rtt').textContent!=='—');
+await mkdir('test-output',{recursive:true});
+// Public screenshots intentionally omit the private session fragment and show no token.
+await page.screenshot({path:'test-output/desktop.png',fullPage:true});
+await page.setViewportSize({width:390,height:844});await page.waitForTimeout(300);
+assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+await page.screenshot({path:'test-output/mobile.png',fullPage:true});
+const result={timestamp:new Date().toISOString(),errors,keys:await page.locator('.key').count(),nonSilentAmplitude:amplitude,keydownToAudioStartMs:timing,webRttMedianMs:await page.locator('#rtt').textContent(),serverDispatchMedianMs:await page.locator('#server-latency').textContent(),midiFilePlayback:true,mobileOverflow:false};
+assert.deepEqual(errors,[]);console.log(JSON.stringify(result,null,2));await writeFile('test-output/browser.json',JSON.stringify(result,null,2));await browser.close();

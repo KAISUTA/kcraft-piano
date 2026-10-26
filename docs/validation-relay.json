@@ -1,0 +1,8 @@
+{
+  "unauthorizedBridge": 401,
+  "crossOrigin": 403,
+  "inactiveRoom": 409,
+  "secondPerformer": 409,
+  "invalidPacketClose": 1008,
+  "disconnectPanic": true
+}

@@ -1,0 +1,19 @@
+name: KCraftPiano
+version: '${project.version}'
+main: jp.kcraft.piano.PianoPlugin
+api-version: '1.21'
+folia-supported: true
+softdepend: [packetevents]
+authors: [jwdeveloper, K-Craft]
+description: 日本語・低遅延Web MIDI対応のFolia版JW Piano
+commands:
+  piano:
+    description: ピアノを開く
+    usage: /piano [create 名前|connect 名前|pack|list|remove 名前|skin 名前 種類|volume 名前 0-100]
+permissions:
+  kcraft.piano.play:
+    default: true
+  kcraft.piano.create:
+    default: op
+  kcraft.piano.admin:
+    default: op

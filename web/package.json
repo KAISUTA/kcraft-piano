@@ -1,0 +1,1 @@
+{"name":"kcraft-piano-web","private":true,"type":"module","scripts":{"build":"node scripts/build.mjs","deploy":"wrangler deploy","test":"node --test test/*.test.mjs"},"dependencies":{"@tonejs/midi":"2.0.28"},"devDependencies":{"esbuild":"0.25.12","minecraft-protocol":"^1.68.0","playwright":"1.58.2","wrangler":"4.152.0","ws":"8.22.0"},"overrides":{"undici":"7.30.1"}}

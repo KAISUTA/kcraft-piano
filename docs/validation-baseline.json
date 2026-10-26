@@ -1,0 +1,34 @@
+{
+  "timestamp": "2026-10-26T10:34:00.626Z",
+  "minecraft": "Folia 26.2",
+  "acks": 101,
+  "roundTripMs": {
+    "count": 101,
+    "min": 46.69560000000001,
+    "p50": 71.20020000000113,
+    "p95": 95.92260000000078,
+    "max": 99.54989999999998
+  },
+  "serverDispatchMs": {
+    "count": 101,
+    "min": 5.491822,
+    "p50": 27.979694,
+    "p95": 48.140193,
+    "max": 51.500803
+  },
+  "packets": {
+    "entity_status": 1,
+    "entity_metadata": 212,
+    "entity_update_attributes": 115,
+    "spawn_entity": 106,
+    "sync_entity_position": 141,
+    "entity_velocity": 115,
+    "entity_move_look": 7,
+    "entity_head_rotation": 34,
+    "rel_entity_move": 252,
+    "entity_equipment": 244,
+    "entity_destroy": 1,
+    "entity_look": 4,
+    "stop_sound": 616
+  }
+}

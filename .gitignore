@@ -110,3 +110,16 @@ buildNumber.properties
 
 # Common working directory
 run/
+
+# Local deployment credentials and generated web output
+.local/
+web/node_modules/
+web/public/app.js*
+web/public/samples/
+web/public/downloads/
+web/public/JW-Piano-license.txt
+web/public/_headers
+web/.wrangler/
+.wrangler/
+web/test-output/
+web/test-output*.png

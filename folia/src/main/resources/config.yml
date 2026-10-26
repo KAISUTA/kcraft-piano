@@ -1,0 +1,10 @@
+# Cloudflareへの外向き接続のみ。ポート開放は不要。
+web-url: https://kcraft-piano.workers.dev
+bridge-secret: ''
+resource-pack-url: ''
+resource-pack-sha1: ''
+max-pianos: 10
+hearing-distance: 32
+session-minutes: 60
+# 手元はWeb音声、近くの人はMinecraft音声。自分への二重発音を防ぐ。
+mute-performer-in-game: true

@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#eef2f7"><meta name="referrer" content="no-referrer"><title>K-Craft Piano</title><link rel="stylesheet" href="/style.css"></head>
+<body>
+<header><a class="brand" href="/">K-CRAFT <span>PIANO</span></a><div class="connection"><i id="connection-dot"></i><span id="connection">手元で演奏</span></div></header>
+<main>
+<div class="title-row"><div><p class="eyebrow">演奏</p><h1>ピアノ</h1></div><div class="instrument"><span>音源</span><strong>グランドピアノ</strong><small>88鍵 · JW Piano</small></div></div>
+<div class="controls">
+  <button id="start" class="primary">音を有効にする</button>
+  <div class="control"><label for="volume">手元の音量 <output id="volume-value">65%</output></label><input id="volume" type="range" min="0" max="100" value="65"></div>
+  <div class="control midi-control"><label for="midi">MIDI入力</label><div class="input-row"><select id="midi"><option value="">PCキーボード・タッチ</option></select><button id="midi-enable">接続</button></div></div>
+  <button id="panic" class="quiet">すべて消音</button>
+</div>
+<p id="status" role="status">音を有効にすると、PCキーボード・タッチで演奏できます。</p>
+<section class="piano" aria-label="ピアノ鍵盤"><div class="piano-top"><span>GRAND PIANO</span><div class="pedal-label"><i id="pedal-led"></i> サステイン <kbd>Space</kbd></div></div><div id="keyboard-scroll"><div id="keyboard" role="group" aria-label="88鍵"></div></div><div class="piano-bottom"><span>A0</span><span id="note-display">—</span><span>C8</span></div></section>
+<div class="below-piano"><p><kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> <kbd>F</kbd> <kbd>G</kbd> <kbd>H</kbd> <kbd>J</kbd> <kbd>K</kbd> で白鍵 · <kbd>W</kbd> <kbd>E</kbd> <kbd>T</kbd> <kbd>Y</kbd> <kbd>U</kbd> で黒鍵</p><div class="octave"><button id="octave-down" aria-label="1オクターブ下げる">−</button><span id="octave-label">中央 C4</span><button id="octave-up" aria-label="1オクターブ上げる">＋</button></div></div>
+<div class="workspace">
+<section class="midi-file"><div class="section-title"><h2>MIDIファイル</h2><label class="file-label" for="file">ファイルを選ぶ<input type="file" id="file" accept=".mid,.midi,audio/midi"></label></div><p id="file-name">.mid / .midi を読み込んで自動演奏</p><div class="playback"><button id="play" disabled>再生</button><button id="stop" disabled>停止</button><input type="range" id="progress" min="0" max="1000" value="0" disabled aria-label="再生位置"><span id="time">0:00 / 0:00</span></div></section>
+<section class="latency"><div class="section-title"><h2>遅延を確認</h2><span id="measurement-state">未計測</span></div><dl><div><dt>音声出力の目安</dt><dd><b id="audio-latency">—</b><small>ms</small></dd></div><div><dt>Minecraft往復</dt><dd><b id="rtt">—</b><small>ms</small></dd></div><div><dt>サーバー内処理</dt><dd><b id="server-latency">—</b><small>ms</small></dd></div></dl><p>音声出力はブラウザの推定値。Minecraft往復はサーバーの発音処理までの応答時間で、実際に耳へ届く時間とは異なります。</p></section>
+</div>
+<details class="help"><summary>Minecraftで演奏する</summary><p>ゲーム内で <code>/piano</code> を開き、ピアノを選んで表示されたリンクへ進んでください。モデルと音源は <code>/piano pack</code> で適用できます。接続URLは自分専用です。</p><p>手元の音は通信を待たずに鳴ります。Minecraft内では近くのプレイヤーに音が届きます。ヘッドホンを使い、Bluetoothを避けると機器側の遅延を減らせます。</p></details>
+</main><footer><span>K-Craft Piano · Folia edition</span><a href="/credits.html">原作者・音源・ライセンス</a><a href="/downloads/kcraft-piano-folia-2.0.0.jar">プラグインをダウンロード</a></footer>
+<script type="module" src="/app.js"></script></body></html>

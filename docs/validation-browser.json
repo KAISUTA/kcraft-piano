@@ -1,0 +1,18 @@
+{
+  "timestamp": "2026-10-26T10:49:36.242Z",
+  "errors": [],
+  "keys": 88,
+  "nonSilentAmplitude": 0.09320088475942612,
+  "keydownToAudioStartMs": {
+    "count": 23,
+    "min": 0,
+    "p50": 0.09999999403953552,
+    "p95": 0.20000000298023224,
+    "baseLatency": 0.01,
+    "outputLatency": 0.04
+  },
+  "webRttMedianMs": "32.1",
+  "serverDispatchMedianMs": "0.0",
+  "midiFilePlayback": true,
+  "mobileOverflow": false
+}

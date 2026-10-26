@@ -1,0 +1,8 @@
+{
+  "name": "kcraft-piano",
+  "main": "worker.js",
+  "compatibility_date": "2026-10-26",
+  "assets": { "directory": "./public", "binding": "ASSETS", "run_worker_first": ["/bridge/*", "/play/*", "/health"] },
+  "durable_objects": { "bindings": [{ "name": "ROOMS", "class_name": "PianoRoom" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["PianoRoom"] }]
+}
