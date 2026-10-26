@@ -4,6 +4,10 @@
 <header><a class="brand" href="/">K-CRAFT <span>PIANO</span></a><div class="connection"><i id="connection-dot"></i><span id="connection">手元で演奏</span></div></header>
 <main>
 <div class="title-row"><div><p class="eyebrow">演奏</p><h1>ピアノ</h1></div><div class="instrument"><span>音源</span><strong>グランドピアノ</strong><small>88鍵 · JW Piano</small></div></div>
+<section class="server-connect" aria-label="Minecraft接続">
+<form id="login-form"><label for="password">固定パスワード</label><input id="password" type="password" autocomplete="current-password" required maxlength="128"><button type="submit">Minecraftに接続</button></form>
+<div id="piano-controls" hidden><label for="piano-select">演奏するピアノ</label><select id="piano-select"></select><button id="reconnect" type="button">再接続</button></div>
+<p id="login-status" role="status">同じURLとパスワードで、いつでも接続できます。</p></section>
 <div class="controls">
   <button id="start" class="primary">音を有効にする</button>
   <div class="control"><label for="volume">手元の音量 <output id="volume-value">65%</output></label><input id="volume" type="range" min="0" max="100" value="65"></div>
@@ -18,6 +22,6 @@
 <section class="latency"><div class="section-title"><h2>遅延を確認</h2><span id="measurement-state">未計測</span></div><dl><div><dt>音声出力の目安</dt><dd><b id="audio-latency">—</b><small>ms</small></dd></div><div><dt>Minecraft往復</dt><dd><b id="rtt">—</b><small>ms</small></dd></div><div><dt>サーバー内処理</dt><dd><b id="server-latency">—</b><small>ms</small></dd></div></dl><p>音声出力はブラウザの推定値。Minecraft往復はサーバーの発音処理までの応答時間で、実際に耳へ届く時間とは異なります。</p></section>
 </div>
 <details class="help midi-file"><summary>MIDIファイルの自動演奏（補助機能）</summary><div class="section-title"><h2>MIDIファイル</h2><label class="file-label" for="file">ファイルを選ぶ<input type="file" id="file" accept=".mid,.midi,audio/midi"></label></div><p id="file-name">.mid / .midi を読み込んで自動演奏</p><div class="playback"><button id="play" disabled>再生</button><button id="stop" disabled>停止</button><input type="range" id="progress" min="0" max="1000" value="0" disabled aria-label="再生位置"><span id="time">0:00 / 0:00</span></div></details>
-<details class="help"><summary>Minecraftで演奏する</summary><p>ゲーム内で <code>/piano</code> を開き、ピアノを選んで表示されたリンクへ進んでください。モデルと音源は <code>/piano pack</code> で適用できます。接続URLは自分専用です。</p><p>手元の音は通信を待たずに鳴ります。Minecraft内では自分と近くのプレイヤーに音が届きます。二重に聞こえる場合は、この画面の音量を0にしてください。ヘッドホンを使い、Bluetoothを避けると機器側の遅延を減らせます。</p></details>
-</main><footer><span>K-Craft Piano · Folia edition</span><a href="/credits.html">原作者・音源・ライセンス</a><a href="/downloads/kcraft-piano-folia-2.1.1.jar">プラグインをダウンロード</a></footer>
+<details class="help"><summary>Minecraftで演奏する</summary><p>この固定ページでパスワードを入力し、演奏するピアノを選びます。ゲーム内コマンドで毎回リンクを発行する必要はありません。パスワードは演奏を許可する人だけに渡してください。</p><p>手元の音は通信を待たずに鳴ります。Minecraft内では自分と近くのプレイヤーに音が届きます。二重に聞こえる場合は、この画面の音量を0にしてください。MIDI入力・MIDIファイル再生はMinecraft操作中も継続します。</p></details>
+</main><footer><span>K-Craft Piano · Folia edition</span><a href="/credits.html">原作者・音源・ライセンス</a><a href="/downloads/kcraft-piano-folia-2.2.0.jar">プラグインをダウンロード</a></footer>
 <script type="module" src="/app.js"></script></body></html>

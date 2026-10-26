@@ -14,7 +14,9 @@ await page.addInitScript(()=>{
   window.addEventListener('keydown',e=>{if(e.code==='KeyA')window.__downs.push(performance.now());},true);
   const Native=window.AudioContext;window.AudioContext=new Proxy(Native,{construct(target,args){const ctx=new target(...args);window.__audioCtx=ctx;const gain=ctx.createGain.bind(ctx);ctx.createGain=()=>{const node=gain();if(!window.__analyser){window.__analyser=ctx.createAnalyser();node.connect(window.__analyser);}return node;};return ctx;}});
 });
-await page.goto(`${base}/#session=${session.token}`);
+await page.goto(`${base}/#piano=${encodeURIComponent(session.name)}`);
+await page.locator('#password').fill((await readFile('../.local/fixed-password.txt','utf8')).trim());
+await page.getByRole('button',{name:'Minecraftに接続',exact:true}).click();
 await page.waitForFunction(()=>document.querySelector('#connection').textContent==='Minecraft 接続済み',null,{timeout:15000});
 await page.getByRole('button',{name:'音を有効にする'}).click();
 await page.waitForFunction(()=>document.querySelector('#start').textContent==='音声 有効',null,{timeout:45000});

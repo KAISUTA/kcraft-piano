@@ -1,10 +1,17 @@
 # K-Craft Piano / Folia edition
 
-[演奏画面](https://kcraft-piano.kaisuta-works.workers.dev/) · [JAR](https://kcraft-piano.kaisuta-works.workers.dev/downloads/kcraft-piano-folia-2.1.1.jar) · [リソースパック](https://kcraft-piano.kaisuta-works.workers.dev/downloads/kcraft-piano-pack.zip)
+[演奏画面](https://kcraft-piano.kaisuta-works.workers.dev/) · [JAR](https://kcraft-piano.kaisuta-works.workers.dev/downloads/kcraft-piano-folia-2.2.0.jar) · [リソースパック](https://kcraft-piano.kaisuta-works.workers.dev/downloads/kcraft-piano-pack.zip)
 
 [jwdeveloper/JW_Piano](https://github.com/jwdeveloper/JW_Piano) のFolia向けフォーク。原版のピアノモデル・テクスチャ・88鍵の音源・鍵盤配置を継承し、日本語のゲーム内操作とブラウザ演奏を追加しました。
 
 原版の公開終了したFluentAPIには依存しません。実行するコードは `folia/`、Web画面とCloudflare中継は `web/` です。ルートの `src/` と `pom.upstream.xml` は原版の履歴・参照用として残しています。ルートの `mvn package` でもFolia版をビルドできます。原版の説明は [README.upstream.md](README.upstream.md) です。
+
+## 2.2.0の変更
+
+- 毎回のセッションURL・60分制限・プレイヤー退出による失効を廃止。固定ページで固定パスワードを入力し、ピアノを選びます。
+- 各ピアノが自動で常設WebSocketを接続し、切断時は再接続します。ブラウザの認証はHttpOnly Cookieに30日保存します。
+- 裏画面への切替でMIDIファイルを停止する処理を削除。AudioWorkletの音声時計で再生を継続し、USB MIDI入力も維持します。
+- Java版の参加者へパックを自動追加。KCraftGuideの `kcraft_touring` が有効な間は待ち、終了後に適用します。案内パックを置き換えません。統合版へJavaパックは送信しません。
 
 ## 2.1.1の修正
 
@@ -27,7 +34,7 @@
 2. ゲーム内音声: 16バイトの入力 → Cloudflare WebSocket → Java WebSocket → サーバー既存接続への送信。PacketEventsや接続受付への注入を使わず、音声のFolia tick待ちもありません。
 3. 鍵盤モデル: ItemDisplayを使い、配置・更新・削除を各エンティティを所有するリージョンへ送ります。任意の位置・向きに設置でき、チャンク境界をまたいでも動作します。見た目と同じ鍵盤座標に対してレイと直方体の交差判定を行います。
 
-サーバーはCloudflareへ外向きのWSS接続を張ります。ポート開放や公開用のMinecraft側Webサーバーは不要です。接続URLは256bitのランダム値、発行はゲーム内、1ピアノ1演奏者、最大60分、ログアウト時に失効します。管理用の共有シークレットはブラウザへ配布しません。
+サーバーはCloudflareへ外向きのWSS接続を張ります。ポート開放や公開用のMinecraft側Webサーバーは不要です。固定URLへアクセスし、管理者が生成した固定パスワードで認証します。認証後はピアノを選択でき、同じピアノでは最後に接続したページが操作します。管理用の共有シークレットはブラウザへ配布しません。
 
 ### 2.1.0の実測（2026-10-26、Folia 26.2 / Java 25）
 
@@ -54,7 +61,7 @@ Chromiumでの打鍵イベント → AudioBufferSourceNode.start呼出しは中�
 
 - Paper/Folia 1.21.4以降向けのAPIでビルド。実機検証はFolia 26.2。Minecraft本体が要求するJavaを使用してください（26.2はJava 25）。
 - **2.1.0以降はPacketEvents不要です。** 既存のサーバー接続に音声パケットだけを送信します。高速経路はFolia 26.2で検証済み。対象APIが見つからない版では標準のFoliaスケジューラ経由に切り替えます。
-- `kcraft-piano-folia-2.1.1.jar` を `plugins/` へ配置します。2.1.0は接続中プレイヤーがいる状態でのPlugMan入れ替えを検証しています。サーバー全体の再起動は運営者の許可を得てから行ってください。
+- `kcraft-piano-folia-2.2.0.jar` を `plugins/` へ配置します。2.1.0は接続中プレイヤーがいる状態でのPlugMan入れ替えを検証しています。サーバー全体の再起動は運営者の許可を得てから行ってください。
 
 `plugins/KCraftPiano/config.yml`:
 
@@ -65,7 +72,7 @@ resource-pack-url: https://kcraft-piano.kaisuta-works.workers.dev/downloads/kcra
 resource-pack-sha1: 43674cbc9774365f3c41fcd87a3ad2be0795c8d7
 max-pianos: 10
 hearing-distance: 32
-session-minutes: 60
+auto-resource-pack: true
 mute-performer-in-game: false
 ```
 
@@ -78,7 +85,7 @@ mute-performer-in-game: false
 | `/piano` | 日本語の一覧から演奏するピアノを選択 |
 | `/piano create [名前]` | 見ているブロックの上、または前方2ブロックへ設置（OP既定） |
 | `/piano move 名前` | 指定位置へ移動し、向きも合わせる |
-| `/piano connect 名前` | 32ブロック以内から専用URLを発行 |
+| `/piano connect 名前` | 32ブロック以内から固定演奏ページを開く |
 | `/piano pack` | Java版のモデル・音源パックを適用 |
 | `/piano list` | 一覧 |
 | `/piano skin 名前 grand/upright/electric/closed` | 外観を変更 |
@@ -87,7 +94,7 @@ mute-performer-in-game: false
 
 PCのA/S/D/F/G/H/J/Kが白鍵、W/E/T/Y/Uが黒鍵、Spaceがサステイン。タッチとUSB MIDI、MIDIファイルの再生・一時停止・シーク・停止にも対応します。MIDI機器にはWeb MIDI対応のChrome / Edgeを使用してください。PCキーやタッチはフォーカス喪失時に離しますが、MIDI入力とペダルはMinecraft操作中も継続します。機器切断やWebSocket切断時には消音します。
 
-権限: `kcraft.piano.play` は全員、`kcraft.piano.create` / `kcraft.piano.admin` はOP既定。接続URLは共有しないでください。
+権限: `kcraft.piano.play` は全員、`kcraft.piano.create` / `kcraft.piano.admin` はOP既定。固定パスワードは演奏を許可する人だけに渡してください。
 
 ## 原版との差分・制限
 
@@ -115,6 +122,8 @@ JARを `web/public/downloads/` にコピーするとWebサイトから配布で�
 npx wrangler whoami
 # 値は対話入力。ソースやwrangler.jsoncへ書かない。
 npx wrangler secret put BRIDGE_SECRET
+# 固定パスワードのSHA-256（小文字16進64文字）。平文を公開しない。
+npx wrangler secret put PLAY_PASSWORD_HASH
 npm run deploy
 ```
 

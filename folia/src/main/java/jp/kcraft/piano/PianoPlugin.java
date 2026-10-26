@@ -20,7 +20,6 @@ import java.io.File;
 import java.net.URI;
 import java.net.http.*;
 import java.nio.*;
-import java.security.SecureRandom;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
@@ -34,9 +33,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public final class PianoPlugin extends JavaPlugin implements Listener, CommandExecutor, TabCompleter {
     private final Map<String, Piano> pianos = new ConcurrentHashMap<>();
     private final Map<UUID, Player> players = new ConcurrentHashMap<>();
-    private final Map<UUID, Session> sessions = new ConcurrentHashMap<>();
+    private final Map<String, Session> sessions = new ConcurrentHashMap<>();
     private final Map<UUID, Long> clicks = new ConcurrentHashMap<>();
-    private final SecureRandom random = new SecureRandom();
+    private final Set<UUID> pendingPacks=ConcurrentHashMap.newKeySet();
+    private static final UUID PACK_ID=UUID.nameUUIDFromBytes("kcraft-piano-pack".getBytes(java.nio.charset.StandardCharsets.UTF_8));
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
     private NamespacedKey tag;
     private volatile boolean running;
@@ -59,7 +59,7 @@ public final class PianoPlugin extends JavaPlugin implements Listener, CommandEx
         Objects.requireNonNull(getCommand("piano")).setExecutor(this);
         getCommand("piano").setTabCompleter(this);
         Objects.requireNonNull(getCommand("pianoadmin")).setExecutor(this);
-        for (Player p : Bukkit.getOnlinePlayers()) { players.put(p.getUniqueId(), p); onPlayer(p,()-> {if(realtime!=null)realtime.publish(p,p.getLocation());}); }
+        for (Player p : Bukkit.getOnlinePlayers()) { players.put(p.getUniqueId(), p); onPlayer(p,()-> {if(realtime!=null)realtime.publish(p,p.getLocation());schedulePack(p);}); }
         var saved = YamlConfiguration.loadConfiguration(new File(getDataFolder(), "pianos.yml"));
         for (String name : saved.getKeys(false)) {
             try {
@@ -93,19 +93,20 @@ public final class PianoPlugin extends JavaPlugin implements Listener, CommandEx
         if (Bukkit.isOwnedByCurrentRegion(player)) action.run();
         else player.getScheduler().execute(this, action, null, 1);
     }
-    @EventHandler public void join(PlayerJoinEvent e) { players.put(e.getPlayer().getUniqueId(), e.getPlayer());if(realtime!=null)realtime.publish(e.getPlayer(),e.getPlayer().getLocation()); }
+    @EventHandler(priority=EventPriority.MONITOR) public void join(PlayerJoinEvent e) { players.put(e.getPlayer().getUniqueId(), e.getPlayer());if(realtime!=null)realtime.publish(e.getPlayer(),e.getPlayer().getLocation());schedulePack(e.getPlayer()); }
+    @EventHandler public void packStatus(PlayerResourcePackStatusEvent e){if(PACK_ID.equals(e.getID()))getLogger().info("PIANO PACK status="+e.getStatus()+" player="+e.getPlayer().getName());}
     @EventHandler(priority=EventPriority.MONITOR,ignoreCancelled=true) public void move(PlayerMoveEvent e) { if(realtime!=null && e.getTo()!=null && e.hasChangedPosition())realtime.publish(e.getPlayer(),e.getTo()); }
     @EventHandler(priority=EventPriority.MONITOR) public void changedWorld(PlayerChangedWorldEvent e) { if(realtime!=null)realtime.publish(e.getPlayer(),e.getPlayer().getLocation()); }
     @EventHandler public void quit(PlayerQuitEvent e) {
         UUID id = e.getPlayer().getUniqueId(); players.remove(id); clicks.remove(id);
         if(realtime!=null)realtime.remove(id);
-        Session s = sessions.remove(id); if (s != null) s.close();
+        pendingPacks.remove(id);
     }
     @Override public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if(command.getName().equalsIgnoreCase("pianoadmin")){
             if(sender instanceof Player&&!sender.hasPermission("kcraft.piano.admin"))return true;
-            if(args.length==2&&args[0].equals("pack")){Player target=players.values().stream().filter(p->p.getName().equalsIgnoreCase(args[1])).findFirst().orElse(null);if(target!=null)onPlayer(target,()->target.setResourcePack(pack,getConfig().getString("resource-pack-sha1","")));sender.sendMessage(target==null?"Player offline":"Pack refresh scheduled");}
-            else sender.sendMessage("READY version="+getPluginMeta().getVersion()+" audio="+(realtime==null?"fallback":"direct")+" pianos="+pianos.size()+" onlineSnapshots="+players.size());
+            if(args.length==2&&args[0].equals("pack")){Player target=players.values().stream().filter(p->p.getName().equalsIgnoreCase(args[1])).findFirst().orElse(null);if(target!=null)onPlayer(target,()->schedulePack(target));sender.sendMessage(target==null?"Player offline":"Pack refresh scheduled");}
+            else sender.sendMessage("READY version="+getPluginMeta().getVersion()+" audio="+(realtime==null?"fallback":"direct")+" pianos="+pianos.size()+" onlineSnapshots="+players.size()+" fixedBridges="+sessions.size()+" packsWaiting="+pendingPacks.size());
             return true;
         }
         if (!(sender instanceof Player player)) { sender.sendMessage("ゲーム内から実行してください。"); return true; }
@@ -114,7 +115,7 @@ public final class PianoPlugin extends JavaPlugin implements Listener, CommandEx
         if (args.length == 0) { menu(player); return true; }
         if (args[0].equalsIgnoreCase("pack")) {
             if (pack.isBlank()) player.sendMessage("リソースパックが未設定です。");
-            else player.setResourcePack(pack, getConfig().getString("resource-pack-sha1", ""));
+            else {schedulePack(player);player.sendMessage("パックの適用を予約しました。チュートリアル中は終了後に適用します。");}
             return true;
         }
         if (args[0].equalsIgnoreCase("list")) { player.sendMessage("ピアノ: " + String.join("、", new TreeSet<>(pianos.keySet()))); return true; }
@@ -139,13 +140,8 @@ public final class PianoPlugin extends JavaPlugin implements Listener, CommandEx
             case "connect" -> {
                 if (!piano.origin.getWorld().equals(player.getWorld()) || player.getLocation().distanceSquared(piano.origin) > 1024) { player.sendMessage("ピアノの32ブロック以内で接続してください。"); break; }
                 if (secret.isBlank()) { player.sendMessage("Web接続の設定がまだ完了していません。"); break; }
-                var activeSession=piano.active.get();
-                if (activeSession!=null && !activeSession.player.equals(player.getUniqueId())) { player.sendMessage("このピアノは演奏中です。"); break; }
-                Session previous = sessions.remove(player.getUniqueId()); if (previous != null) previous.close();
-                var session = new Session(player.getUniqueId(), piano);
-                if(!piano.active.compareAndSet(null,session)){player.sendMessage("このピアノは演奏中です。");break;}
-                sessions.put(player.getUniqueId(), session); session.connect();
-                player.sendMessage("演奏画面に接続しています…");
+                startBridge(piano);
+                player.sendMessage(Component.text("▶ 「"+piano.name+"」の固定演奏ページ（パスワード入力）").clickEvent(ClickEvent.openUrl(web+"/#piano="+java.net.URLEncoder.encode(piano.name,java.nio.charset.StandardCharsets.UTF_8))));
             }
             case "remove", "remo", "delete", "move", "skin", "volume" -> {
                 if (!piano.owner.equals(player.getUniqueId()) && !player.hasPermission("kcraft.piano.admin")) { player.sendMessage("設置者か運営だけが変更できます。"); break; }
@@ -263,7 +259,7 @@ public final class PianoPlugin extends JavaPlugin implements Listener, CommandEx
                 for(int i=0;i<88;i++){int index=i;created.add(model(position(geometry.x[i],geometry.floor(i),geometry.centerZ(i)),geometry.black[i]?167075:167077,geometry.black[i]?Color.fromRGB(22,22,22):Color.WHITE,new Vector3f(0,.1f,0),new Vector3f((float)(4*KeyboardGeometry.WHITE_WIDTH),.2f,(float)geometry.depthScale(i))).thenAccept(e->keys[index]=e));}
                 created.add(model(position(0,0,1.05),167072,Color.WHITE,new Vector3f(0,.5f,0),new Vector3f(1)));
                 return CompletableFuture.allOf(created.toArray(CompletableFuture[]::new));
-            }).whenComplete((ignored,error)->{if(error!=null)getLogger().severe("Model creation failed "+name+": "+error);else{ready=!removed;getLogger().info("MODEL READY name="+name+" pieces="+models.size()+" yaw="+origin.getYaw());}});
+            }).whenComplete((ignored,error)->{if(error!=null)getLogger().severe("Model creation failed "+name+": "+error);else{ready=!removed;if(ready)startBridge(this);getLogger().info("MODEL READY name="+name+" pieces="+models.size()+" yaw="+origin.getYaw());}});
         }
         KeyboardGeometry.Hit hit(Location eye,org.bukkit.util.Vector direction){
             double a=Math.toRadians(origin.getYaw()),c=Math.cos(a),v=Math.sin(a),x=eye.getX()-origin.getX(),z=eye.getZ()-origin.getZ();
@@ -305,27 +301,26 @@ public final class PianoPlugin extends JavaPlugin implements Listener, CommandEx
         }
     }
     private final class Session implements WebSocket.Listener {
-        final UUID player; final Piano piano; final String token;
-        final long expires=System.nanoTime()+TimeUnit.MINUTES.toNanos(Math.max(1,Math.min(60,getConfig().getInt("session-minutes",60))));
+        final Piano piano; final String token;
         final AtomicInteger pending=new AtomicInteger();
         final java.io.ByteArrayOutputStream fragments = new java.io.ByteArrayOutputStream(16);
         volatile WebSocket socket; volatile boolean closed;
         volatile long probeSent;
         CompletableFuture<WebSocket> outgoing=CompletableFuture.completedFuture(null);
         final AtomicInteger outgoingCount=new AtomicInteger();
-        Session(UUID player,Piano piano) { this.player=player; this.piano=piano; byte[] bytes=new byte[32];random.nextBytes(bytes);token=Base64.getUrlEncoder().withoutPadding().encodeToString(bytes); }
+        Session(Piano piano) {this.piano=piano;try{token=Base64.getUrlEncoder().withoutPadding().encodeToString(java.security.MessageDigest.getInstance("SHA-256").digest(piano.name.getBytes(java.nio.charset.StandardCharsets.UTF_8)));}catch(java.security.NoSuchAlgorithmException e){throw new IllegalStateException(e);}}
+
         void connect() {
             http.newWebSocketBuilder().connectTimeout(Duration.ofSeconds(10)).header("Authorization","Bearer "+secret)
-                .buildAsync(URI.create(web.replaceFirst("^http","ws")+"/bridge/"+token),this).whenComplete((ws,error)-> {
-                    if(error!=null) { close(); Player p=players.get(player);if(p!=null)onPlayer(p,()->p.sendMessage("Web接続に失敗しました。/piano connect "+piano.name+" で再接続してください。")); }
+                .buildAsync(URI.create(web.replaceFirst("^http","ws")+"/bridge/"+token+"?name="+java.net.URLEncoder.encode(piano.name,java.nio.charset.StandardCharsets.UTF_8)),this).whenComplete((ws,error)-> {
+                    if(error!=null) retry();
                 });
-            Bukkit.getAsyncScheduler().runDelayed(PianoPlugin.this,t-> { sessions.remove(player,this); close(); },Math.max(1,Math.min(60,getConfig().getInt("session-minutes",60))),TimeUnit.MINUTES);
+
         }
         public void onOpen(WebSocket ws) {
             socket=ws;if(closed){ws.abort();return;} ws.request(1);
             // Warm the relay before the first MIDI note; serialize with later binary sends.
             probeSent=System.nanoTime();outgoing=ws.sendText("ping",true);
-            Player p=players.get(player);if(p!=null)onPlayer(p,()->p.sendMessage(Component.text("▶ 「"+piano.name+"」の演奏画面を開く（接続URLは共有しないでください）").clickEvent(ClickEvent.openUrl(web+"/#session="+token))));
         }
         public CompletionStage<?> onText(WebSocket ws,CharSequence data,boolean last) { if(getConfig().getBoolean("latency-probe",false)&&last&&data.toString().equals("pong")&&probeSent!=0)getLogger().info("BRIDGE PROBE ms="+(System.nanoTime()-probeSent)/1_000_000d);ws.request(1);return null; }
         public CompletionStage<?> onBinary(WebSocket ws,ByteBuffer data,boolean last) {
@@ -336,13 +331,13 @@ public final class PianoPlugin extends JavaPlugin implements Listener, CommandEx
             ws.request(1);return null;
         }
         void receive(byte[] bytes) {
-            if(closed||System.nanoTime()>expires||bytes.length!=16)return;
+            if(closed||bytes.length!=16)return;
             ByteBuffer b=ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN);
             int type=Byte.toUnsignedInt(b.get()),note=Byte.toUnsignedInt(b.get()),vel=Byte.toUnsignedInt(b.get()),channel=Byte.toUnsignedInt(b.get());
             if(type>3||vel>127||channel>15||(type==0&&(note<21||note>108))||!Double.isFinite(b.getDouble(8)))return;
             long received=System.nanoTime();
             if(realtime!=null){
-                realtime.handle(piano.voice,type,note,vel,piano.volume,player);
+                realtime.handle(piano.voice,type,note,vel,piano.volume,null);
                 acknowledge(bytes,received);
                 if(type==0)piano.queueAnimation(note,vel);
                 else if(type==2)at(piano,piano::resetKeys);
@@ -351,7 +346,7 @@ public final class PianoPlugin extends JavaPlugin implements Listener, CommandEx
             if(pending.incrementAndGet()>512){pending.decrementAndGet();close();return;}
             at(piano,()-> {
                 pending.decrementAndGet(); if(closed)return;
-                if(type==0)piano.note(note,vel,player);else if(type==1)piano.pedal(vel>0);else if(type==2)piano.panic();
+                if(type==0)piano.note(note,vel,null);else if(type==1)piano.pedal(vel>0);else if(type==2)piano.panic();
                 acknowledge(bytes,received);
             });
         }
@@ -360,11 +355,31 @@ public final class PianoPlugin extends JavaPlugin implements Listener, CommandEx
             if(outgoingCount.incrementAndGet()>512){outgoingCount.decrementAndGet();close();return;}
             ByteBuffer ack=ByteBuffer.allocate(24).order(ByteOrder.LITTLE_ENDIAN);ack.put(bytes);ack.putDouble((System.nanoTime()-received)/1_000_000d);ack.flip();
             outgoing=outgoing.thenCompose(ignored->closed?CompletableFuture.completedFuture(ws):ws.sendBinary(ack,true));
-            outgoing.whenComplete((ignored,error)->{outgoingCount.decrementAndGet();if(error!=null)close();});
+            outgoing.whenComplete((ignored,error)->{outgoingCount.decrementAndGet();if(error!=null)retry();});
         }
-        public CompletionStage<?> onClose(WebSocket ws,int code,String reason) { close();return null; }
-        public void onError(WebSocket ws,Throwable error) { close(); }
-        void close() { if(closed)return;closed=true;sessions.remove(player,this);piano.active.compareAndSet(this,null);WebSocket ws=socket;if(ws!=null)ws.abort();if(realtime!=null){realtime.handle(piano.voice,2,0,0,piano.volume,null);at(piano,()->{if(piano.active.get()==null)piano.resetKeys();});}else at(piano,()->{if(piano.active.get()==null)piano.panic();}); }
+        public CompletionStage<?> onClose(WebSocket ws,int code,String reason) { retry();return null; }
+        public void onError(WebSocket ws,Throwable error) { retry(); }
+        synchronized void retry(){if(closed)return;close();if(running&&!piano.removed&&pianos.get(piano.name)==piano)Bukkit.getAsyncScheduler().runDelayed(PianoPlugin.this,t->startBridge(piano),2,TimeUnit.SECONDS);}
+        void close() { if(closed)return;closed=true;sessions.remove(piano.name,this);piano.active.compareAndSet(this,null);WebSocket ws=socket;if(ws!=null)ws.abort();if(realtime!=null){realtime.handle(piano.voice,2,0,0,piano.volume,null);at(piano,()->{if(piano.active.get()==null)piano.resetKeys();});}else at(piano,()->{if(piano.active.get()==null)piano.panic();}); }
+    }
+    private synchronized void startBridge(Piano piano){
+        if(!running||piano.removed||!piano.ready||web.isBlank()||secret.isBlank()||pianos.get(piano.name)!=piano)return;
+        Session bridge=new Session(piano);if(sessions.putIfAbsent(piano.name,bridge)!=null)return;piano.active.set(bridge);bridge.connect();
+    }
+    private boolean bedrock(Player player){
+        if(Bukkit.getPluginManager().getPlugin("floodgate")==null)return false;
+        try{Class<?> api=Class.forName("org.geysermc.floodgate.api.FloodgateApi",true,Bukkit.getPluginManager().getPlugin("floodgate").getClass().getClassLoader());Object instance=api.getMethod("getInstance").invoke(null);return (boolean)api.getMethod("isFloodgatePlayer",UUID.class).invoke(instance,player.getUniqueId());}catch(ReflectiveOperationException e){return player.getUniqueId().getMostSignificantBits()==0;}
+    }
+    private void schedulePack(Player player){
+        if(pack.isBlank()||bedrock(player)||!getConfig().getBoolean("auto-resource-pack",true)||!pendingPacks.add(player.getUniqueId()))return;
+        int[] idle={0};player.getScheduler().runAtFixedRate(this,task->{
+            if(!running||!player.isOnline()){pendingPacks.remove(player.getUniqueId());task.cancel();return;}
+            if(player.getMetadata("kcraft_touring").stream().anyMatch(org.bukkit.metadata.MetadataValue::asBoolean)){idle[0]=0;return;}
+            if(++idle[0]<2)return;
+            try{byte[] hash=java.util.HexFormat.of().parseHex(getConfig().getString("resource-pack-sha1",""));player.addResourcePack(PACK_ID,pack,hash,"K-Craftのピアノモデル・音源を読み込みます",false);getLogger().info("PIANO PACK sent player="+player.getName()+" afterTutorial=true");}
+            catch(RuntimeException e){getLogger().warning("Piano pack request failed: "+e.getMessage());}
+            pendingPacks.remove(player.getUniqueId());task.cancel();
+        },()->pendingPacks.remove(player.getUniqueId()),40L,20L);
     }
     private void save() {
         var yaml=new YamlConfiguration();

@@ -123,3 +123,5 @@ web/.wrangler/
 .wrangler/
 web/test-output/
 web/test-output*.png
+
+web/.dev.vars

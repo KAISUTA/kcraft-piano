@@ -41,11 +41,13 @@ if(process.env.PIANO_LATE_LOAD==='1'){console.log('Testing scoped PlugMan reload
 console.log('Minecraft joined. chat=',typeof client.chat,'position=',position&&{x:position.x,y:position.y,z:position.z});
 const pianoName=process.env.PIANO_TEST_CORNER==='1'?'corner':'verify';
 if(process.env.PIANO_TEST_CORNER==='1'){await rcon('tp PianoTest 15.9 -60 12 0 0');await wait(500);}
-client.chat('/piano create '+pianoName);await wait(2500);client.chat('/piano connect '+pianoName);
-for(let i=0;i<20&&!token;i++)await wait(500);
-assert.ok(token,'A real player must receive an authenticated web session link');
-await mkdir('../.local',{recursive:true});await writeFile('../.local/test-session.json',JSON.stringify({token,base}));
-const socket=new WebSocket(`${base.replace('https','wss')}/play/${token}`,{origin:base});
+client.chat('/piano create '+pianoName);await wait(2500);
+const password=(await readFile('../.local/fixed-password.txt','utf8')).trim();
+const login=await fetch(base+'/api/login',{method:'POST',headers:{Origin:base,'Content-Type':'application/json'},body:JSON.stringify({password})});assert.equal(login.status,200);
+const cookie=login.headers.get('set-cookie').split(';')[0];
+let selected;for(let i=0;i<20&&!selected;i++){const list=await(await fetch(base+'/api/pianos',{headers:{Cookie:cookie}})).json();selected=list.find(p=>p.name===pianoName);if(!selected)await wait(500);}assert.ok(selected,'Piano must register its permanent bridge automatically');
+await mkdir('../.local',{recursive:true});await writeFile('../.local/test-session.json',JSON.stringify({id:selected.id,name:pianoName,base}));
+const socket=new WebSocket(`${base.replace('https','wss')}/play/${selected.id}`,{origin:base,headers:{Cookie:cookie}});
 await new Promise((resolve,reject)=>{socket.once('open',resolve);socket.once('error',reject);});
 const times=[],delays=[],receivedSequences=new Set();let acks=0,sent=0;socket.on('message',(data,binary)=>{if(!binary)return;if(data.length!==24)return;times.push(performance.now()-data.readDoubleLE(8));delays.push(data.readDoubleLE(16));receivedSequences.add(data.readUInt32LE(4));acks++;});
 socket.on('close',(code,reason)=>console.log('Relay closed',code,reason.toString()));

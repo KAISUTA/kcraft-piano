@@ -1,0 +1,11 @@
+{
+  "fixedUrl": true,
+  "passwordRequired": true,
+  "wrongPasswordRejected": true,
+  "fixedRoomReopen": true,
+  "backgroundUsbMidi": true,
+  "backgroundFileMidi": true,
+  "backgroundNotes": 27,
+  "reopenWithoutCommand": true,
+  "physicalMidiDeviceTested": false
+}
