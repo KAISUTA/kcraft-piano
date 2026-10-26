@@ -52,7 +52,7 @@ public final class PianoPlugin extends JavaPlugin implements Listener, CommandEx
         web = getConfig().getString("web-url", "").replaceAll("/+$", "");
         secret = getConfig().getString("bridge-secret", ""); pack = getConfig().getString("resource-pack-url", "");
         range = Math.max(1, Math.min(128, getConfig().getDouble("hearing-distance", 32)));
-        mute = getConfig().getBoolean("mute-performer-in-game", true);
+        mute = getConfig().getBoolean("mute-performer-in-game", false);
         try { realtime=new RealtimeAudio(range,mute);getLogger().info("音声: 接続注入なし・tick待ちなしの直接送信"); }
         catch(ReflectiveOperationException e){getLogger().warning("直接音声APIが使えないため安全な標準APIへ切替: "+e);}
         getServer().getPluginManager().registerEvents(this, this);
@@ -235,11 +235,12 @@ public final class PianoPlugin extends JavaPlugin implements Listener, CommandEx
         Piano(String name,UUID owner,Location origin){this.name=name;this.owner=owner;this.origin=origin.clone();var slots=pianos.values().stream().map(p->p.slot).toList();while(slots.contains(slot))slot++;if(realtime!=null)voice=realtime.voice(this.origin,slot);for(int i=0;i<88;i++)nextAnimation.set(i,-1);}
         Location position(double x,double y,double z){double a=Math.toRadians(origin.getYaw()),c=Math.cos(a),v=Math.sin(a);Location location=origin.clone().add(c*x-v*z,y,v*x+c*z);location.setPitch(0);return location;}
         void entity(ItemDisplay display,Runnable action){if(display==null)return;if(Bukkit.isOwnedByCurrentRegion(display))action.run();else display.getScheduler().execute(PianoPlugin.this,action,null,1);}
+        // Cancel ItemDisplay built-in Y=180 before scaling; keep translation unchanged.
         CompletableFuture<ItemDisplay> model(Location loc,int id,Color color,Vector3f offset,Vector3f scale){
             var result=new CompletableFuture<ItemDisplay>();
             Runnable create=()->{
                 if(removed){result.complete(null);return;}
-                try{ItemDisplay display=loc.getWorld().spawn(loc,ItemDisplay.class,e->{e.setItemStack(item(id,color));e.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.NONE);e.setPersistent(false);e.setInvulnerable(true);e.setSilent(true);e.setDisplayWidth(8);e.setDisplayHeight(6);e.setInterpolationDuration(0);e.setTeleportDuration(0);e.setTransformation(new Transformation(offset,new Quaternionf(),scale,new Quaternionf()));e.getPersistentDataContainer().set(tag,PersistentDataType.STRING,name);});models.add(display);result.complete(display);}
+                try{ItemDisplay display=loc.getWorld().spawn(loc,ItemDisplay.class,e->{e.setItemStack(item(id,color));e.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.NONE);e.setPersistent(false);e.setInvulnerable(true);e.setSilent(true);e.setDisplayWidth(8);e.setDisplayHeight(6);e.setInterpolationDuration(0);e.setTeleportDuration(0);e.setTransformation(new Transformation(offset,new Quaternionf(),scale,new Quaternionf().rotationY((float)Math.PI)));e.getPersistentDataContainer().set(tag,PersistentDataType.STRING,name);});models.add(display);result.complete(display);}
                 catch(Throwable error){result.completeExceptionally(error);}
             };
             if(Bukkit.isOwnedByCurrentRegion(loc))create.run();else Bukkit.getRegionScheduler().execute(PianoPlugin.this,loc,create);
@@ -259,7 +260,7 @@ public final class PianoPlugin extends JavaPlugin implements Listener, CommandEx
             CompletableFuture.allOf(cleanup.toArray(CompletableFuture[]::new)).thenCompose(ignored->{
                 List<CompletableFuture<?>> created=new ArrayList<>();
                 created.add(model(origin,skin,Color.WHITE,new Vector3f(.16875f,.9f,.2f),new Vector3f(1.8f)).thenAccept(e->body=e));
-                for(int i=0;i<88;i++){int index=i;created.add(model(position(geometry.x[i],geometry.floor(i),geometry.centerZ(i)),geometry.black[i]?167075:167077,geometry.black[i]?Color.fromRGB(22,22,22):Color.WHITE,new Vector3f(0,.1f,0),new Vector3f(.2f,.2f,(float)geometry.depthScale(i))).thenAccept(e->keys[index]=e));}
+                for(int i=0;i<88;i++){int index=i;created.add(model(position(geometry.x[i],geometry.floor(i),geometry.centerZ(i)),geometry.black[i]?167075:167077,geometry.black[i]?Color.fromRGB(22,22,22):Color.WHITE,new Vector3f(0,.1f,0),new Vector3f((float)(4*KeyboardGeometry.WHITE_WIDTH),.2f,(float)geometry.depthScale(i))).thenAccept(e->keys[index]=e));}
                 created.add(model(position(0,0,1.05),167072,Color.WHITE,new Vector3f(0,.5f,0),new Vector3f(1)));
                 return CompletableFuture.allOf(created.toArray(CompletableFuture[]::new));
             }).whenComplete((ignored,error)->{if(error!=null)getLogger().severe("Model creation failed "+name+": "+error);else{ready=!removed;getLogger().info("MODEL READY name="+name+" pieces="+models.size()+" yaw="+origin.getYaw());}});

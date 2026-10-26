@@ -6,5 +6,5 @@ resource-pack-sha1: ''
 max-pianos: 10
 hearing-distance: 32
 session-minutes: 60
-# 手元はWeb音声、近くの人はMinecraft音声。自分への二重発音を防ぐ。
-mute-performer-in-game: true
+# trueにすると演奏者本人のMinecraft音声を無効にする。通常はfalse。
+mute-performer-in-game: false

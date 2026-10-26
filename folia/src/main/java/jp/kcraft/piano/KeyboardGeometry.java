@@ -2,9 +2,9 @@ package jp.kcraft.piano;
 
 /** Visible models and ray intersection share this local coordinate frame. +Z is front. */
 final class KeyboardGeometry {
-    static final double WHITE_WIDTH=.05, WHITE_FLOOR=1.21, BLACK_FLOOR=1.245;
+    static final double WHITE_WIDTH=2.475/52, WHITE_FLOOR=1.16, BLACK_FLOOR=1.195;
     final double[] x=new double[88]; final boolean[] black=new boolean[88];
-    KeyboardGeometry(){int whites=0;for(int i=0;i<88;i++){int pc=(i+21)%12;black[i]=pc==1||pc==3||pc==6||pc==8||pc==10;x[i]=-1.3+(whites+(black[i]?0:.5))*WHITE_WIDTH;if(!black[i])whites++;}}
+    KeyboardGeometry(){int whites=0;for(int i=0;i<88;i++){int pc=(i+21)%12;black[i]=pc==1||pc==3||pc==6||pc==8||pc==10;x[i]=-1.2375+(whites+(black[i]?0:.5))*WHITE_WIDTH;if(!black[i])whites++;}}
     double floor(int i){return black[i]?BLACK_FLOOR:WHITE_FLOOR;}
     double centerZ(int i){return black[i]?.20:.24;}
     double depthScale(int i){return black[i]?.13:.20;}
@@ -12,7 +12,7 @@ final class KeyboardGeometry {
     Hit ray(double ox,double oy,double oz,double dx,double dy,double dz,double reach){
         int note=-1;double nearest=reach;
         for(int i=0;i<88;i++){
-            double half=black[i]?.0125:.025;
+            double half=black[i]?WHITE_WIDTH/4:WHITE_WIDTH/2;
             double minZ=centerZ(i)-.4375*depthScale(i),maxZ=centerZ(i)+.5*depthScale(i);
             double distance=box(ox,oy,oz,dx,dy,dz,x[i]-half-.001,floor(i)-.002,minZ-.002,x[i]+half+.001,floor(i)+.052,maxZ+.002);
             if(distance>=0&&distance<nearest){nearest=distance;note=i+21;}

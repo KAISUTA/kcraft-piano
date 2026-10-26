@@ -15,9 +15,10 @@ async function rcon(command){
 // can read the tested chat/model/sound packets; handshake uses the actual 776 protocol.
 const options={host:'127.0.0.1',port:35689,username:'PianoTest',auth:'offline',version:'26.1',connect(c){options.protocolVersion=776;c.setSocket(net.connect(35689,'127.0.0.1'));}};
 const client=mc.createClient(options);
-const packets=new Map();let token,position;
+const packets=new Map();let token,position;let performerNotes=0,performerStops=0;
 client.on('packet',(data,meta)=>{
   packets.set(meta.name,(packets.get(meta.name)||0)+1);
+  if(JSON.stringify(data)?.includes('kcraft:p')){if(meta.name==='sound_effect')performerNotes++;if(meta.name==='stop_sound')performerStops++;}
   if(meta.name==='position'){position=data;if(data.teleportId!==undefined)client.write('teleport_confirm',{teleportId:data.teleportId});}
   if(meta.name==='update_health'&&data.health<=0)client.write('client_command',{actionId:0});
   if(meta.name==='system_chat'){
@@ -58,6 +59,7 @@ const stats=a=>{const s=[...a].sort((a,b)=>a-b);return{count:s.length,min:s[0],p
 const result={timestamp:new Date().toISOString(),minecraft:'Folia 26.2',acks,roundTripMs:stats(times),serverDispatchMs:stats(delays),packets:Object.fromEntries([...packets].filter(([k])=>/sound|entity|metadata/.test(k)))};
 result.observerSoundPackets=sounds;result.observerSoundPacketNames=[...soundNames];result.customPianoNoteOns=customNotes;result.customPianoStops=customStops;assert.ok(sounds>=80,'Nearby listener must receive both sound and stop packets');
 assert.equal(customNotes,40,'Listener must receive all 40 custom piano note-on packets');
+if(process.env.PIANO_EXPECT_SELF_AUDIO==='1'){assert.equal(performerNotes,40,'Performer must hear all 40 notes in Minecraft');assert.equal(performerStops,40,'Performer must receive all 40 note stops');result.performerNoteOns=performerNotes;result.performerStops=performerStops;}
 await wait(1500);const before=acks;
 for(let i=0;i<250;i++){send(0,21+i%88,100);send(0,21+i%88,0);}
 for(let i=0;i<100&&acks<before+500;i++)await wait(50);
@@ -65,4 +67,4 @@ assert.equal(acks-before,500,'500-message burst must not lose note on/off or ack
 console.log(JSON.stringify(result,null,2));await mkdir('test-output',{recursive:true});await writeFile('test-output/integration.json',JSON.stringify(result,null,2));
 // Keep the Minecraft owner online while a browser verifies the same session.
 socket.close();await wait(700);
-console.log('Browser session ready; test player stays online for 120 seconds.');await wait(120000);client.end();observer.end();
+console.log('Browser session ready; holding test connections for the configured interval.');await wait(Number(process.env.PIANO_KEEPALIVE_MS||120000));client.end();observer.end();
