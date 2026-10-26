@@ -36,18 +36,23 @@ observer.on('packet',(p,m)=>{if(m.name==='position')observer.write('teleport_con
 observer.on('error',e=>console.log('Observer error',e.message));
 await new Promise((r,j)=>{observer.once('login',r);setTimeout(()=>j(Error('Observer timeout')),20000).unref();});
 await rcon('gamemode creative PianoListen');observer.write('client_command',{actionId:0});await wait(1000);
+if(process.env.PIANO_LATE_LOAD==='1'){console.log('Testing scoped PlugMan reload with both clients online:',await rcon('plugman reload KCraftPiano'));await wait(2000);console.log('Runtime status:',await rcon('pianoadmin status'));}
 console.log('Minecraft joined. chat=',typeof client.chat,'position=',position&&{x:position.x,y:position.y,z:position.z});
-client.chat('/piano create verify');await wait(2500);client.chat('/piano connect verify');
+const pianoName=process.env.PIANO_TEST_CORNER==='1'?'corner':'verify';
+if(process.env.PIANO_TEST_CORNER==='1'){await rcon('tp PianoTest 15.9 -60 12 0 0');await wait(500);}
+client.chat('/piano create '+pianoName);await wait(2500);client.chat('/piano connect '+pianoName);
 for(let i=0;i<20&&!token;i++)await wait(500);
 assert.ok(token,'A real player must receive an authenticated web session link');
 await mkdir('../.local',{recursive:true});await writeFile('../.local/test-session.json',JSON.stringify({token,base}));
 const socket=new WebSocket(`${base.replace('https','wss')}/play/${token}`,{origin:base});
 await new Promise((resolve,reject)=>{socket.once('open',resolve);socket.once('error',reject);});
-const times=[],delays=[];let acks=0;socket.on('message',(data,binary)=>{if(!binary)return;if(data.length!==24)return;times.push(performance.now()-data.readDoubleLE(8));delays.push(data.readDoubleLE(16));acks++;});
-function send(type,n=0,v=0){const b=Buffer.alloc(16);b[0]=type;b[1]=n;b[2]=v;b.writeUInt32LE(acks,4);b.writeDoubleLE(performance.now(),8);socket.send(b);}
+const times=[],delays=[],receivedSequences=new Set();let acks=0,sent=0;socket.on('message',(data,binary)=>{if(!binary)return;if(data.length!==24)return;times.push(performance.now()-data.readDoubleLE(8));delays.push(data.readDoubleLE(16));receivedSequences.add(data.readUInt32LE(4));acks++;});
+socket.on('close',(code,reason)=>console.log('Relay closed',code,reason.toString()));
+function send(type,n=0,v=0){const b=Buffer.alloc(16);b[0]=type;b[1]=n;b[2]=v;b.writeUInt32LE(++sent,4);b.writeDoubleLE(performance.now(),8);socket.send(b);}
 // Deterministic 100-packet test: dense chords + note offs + pedal and ping.
 for(let i=0;i<10;i++){for(const n of[60,64,67,72])send(0,n,100);await wait(40);for(const n of[60,64,67,72])send(0,n,0);send(1,0,i%2?0:127);send(3);await wait(70);}
-await wait(1000);send(2);await wait(300);
+await wait(1000);send(2);for(let i=0;i<100&&acks<101;i++)await wait(50);
+if(acks!==101)console.log('Missing sequences',Array.from({length:sent},(_,i)=>i+1).filter(x=>!receivedSequences.has(x)));
 assert.equal(acks,101,'Every valid message must be acknowledged without queue loss');
 const stats=a=>{const s=[...a].sort((a,b)=>a-b);return{count:s.length,min:s[0],p50:s[Math.floor(s.length*.5)],p95:s[Math.floor(s.length*.95)],max:s.at(-1)};};
 const result={timestamp:new Date().toISOString(),minecraft:'Folia 26.2',acks,roundTripMs:stats(times),serverDispatchMs:stats(delays),packets:Object.fromEntries([...packets].filter(([k])=>/sound|entity|metadata/.test(k)))};

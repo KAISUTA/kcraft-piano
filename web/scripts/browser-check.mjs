@@ -28,6 +28,7 @@ for(let i=0;i<20;i++){await page.keyboard.down('a');await page.keyboard.up('a');
 await page.keyboard.down('Space');await page.keyboard.down('a');await page.keyboard.up('a');
 assert.equal(await page.locator('#pedal-led').getAttribute('class'),'on');await page.keyboard.up('Space');
 const midi=new Midi();const track=midi.addTrack();track.addNote({midi:60,time:0,duration:.3,velocity:.8});track.addNote({midi:64,time:.35,duration:.25,velocity:.8});
+await page.locator('.midi-file summary').click();
 await page.locator('#file').setInputFiles({name:'verification.mid',mimeType:'audio/midi',buffer:Buffer.from(midi.toArray())});
 await page.waitForFunction(()=>!document.querySelector('#play').disabled);
 await page.getByRole('button',{name:'再生',exact:true}).click();await page.waitForTimeout(900);

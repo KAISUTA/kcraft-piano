@@ -13,6 +13,9 @@ import org.bukkit.inventory.*;
 import org.bukkit.inventory.meta.LeatherArmorMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.util.Transformation;
+import org.joml.Vector3f;
+import org.joml.Quaternionf;
 import java.io.File;
 import java.net.URI;
 import java.net.http.*;
@@ -50,10 +53,12 @@ public final class PianoPlugin extends JavaPlugin implements Listener, CommandEx
         secret = getConfig().getString("bridge-secret", ""); pack = getConfig().getString("resource-pack-url", "");
         range = Math.max(1, Math.min(128, getConfig().getDouble("hearing-distance", 32)));
         mute = getConfig().getBoolean("mute-performer-in-game", true);
-        if (Bukkit.getPluginManager().isPluginEnabled("packetevents")) { realtime = new RealtimeAudio(range,mute); getLogger().info("PacketEvents: tick待ちなしのサウンド送信を有効化"); }
+        try { realtime=new RealtimeAudio(range,mute);getLogger().info("音声: 接続注入なし・tick待ちなしの直接送信"); }
+        catch(ReflectiveOperationException e){getLogger().warning("直接音声APIが使えないため安全な標準APIへ切替: "+e);}
         getServer().getPluginManager().registerEvents(this, this);
         Objects.requireNonNull(getCommand("piano")).setExecutor(this);
         getCommand("piano").setTabCompleter(this);
+        Objects.requireNonNull(getCommand("pianoadmin")).setExecutor(this);
         for (Player p : Bukkit.getOnlinePlayers()) { players.put(p.getUniqueId(), p); onPlayer(p,()-> {if(realtime!=null)realtime.publish(p,p.getLocation());}); }
         var saved = YamlConfiguration.loadConfiguration(new File(getDataFolder(), "pianos.yml"));
         for (String name : saved.getKeys(false)) {
@@ -63,7 +68,8 @@ public final class PianoPlugin extends JavaPlugin implements Listener, CommandEx
                 var loc = new Location(world, section.getDouble("x"), section.getDouble("y"), section.getDouble("z"));
                 var piano = new Piano(name, UUID.fromString(section.getString("owner")), loc);
                 piano.slot = section.getInt("slot",piano.slot);
-                if(realtime!=null)piano.voice=new RealtimeAudio.Voice(piano.origin,piano.slot);
+                if(realtime!=null)piano.voice=realtime.voice(piano.origin,piano.slot);
+                piano.origin.setYaw((float)section.getDouble("yaw",0));
                 piano.skin = section.getInt("skin", 167085); piano.volume = section.getInt("volume", 70);
                 pianos.put(name, piano); at(piano, piano::spawn);
             } catch (Exception e) { getLogger().warning("ピアノの読込失敗: " + name + ": " + e.getMessage()); }
@@ -96,7 +102,14 @@ public final class PianoPlugin extends JavaPlugin implements Listener, CommandEx
         Session s = sessions.remove(id); if (s != null) s.close();
     }
     @Override public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if(command.getName().equalsIgnoreCase("pianoadmin")){
+            if(sender instanceof Player&&!sender.hasPermission("kcraft.piano.admin"))return true;
+            if(args.length==2&&args[0].equals("pack")){Player target=players.values().stream().filter(p->p.getName().equalsIgnoreCase(args[1])).findFirst().orElse(null);if(target!=null)onPlayer(target,()->target.setResourcePack(pack,getConfig().getString("resource-pack-sha1","")));sender.sendMessage(target==null?"Player offline":"Pack refresh scheduled");}
+            else sender.sendMessage("READY version="+getPluginMeta().getVersion()+" audio="+(realtime==null?"fallback":"direct")+" pianos="+pianos.size()+" onlineSnapshots="+players.size());
+            return true;
+        }
         if (!(sender instanceof Player player)) { sender.sendMessage("ゲーム内から実行してください。"); return true; }
+        if(!Bukkit.isOwnedByCurrentRegion(player)){String[] copy=args.clone();onPlayer(player,()->onCommand(player,command,label,copy));return true;}
         if (!player.hasPermission("kcraft.piano.play")) { player.sendMessage("演奏する権限がありません。"); return true; }
         if (args.length == 0) { menu(player); return true; }
         if (args[0].equalsIgnoreCase("pack")) {
@@ -105,21 +118,20 @@ public final class PianoPlugin extends JavaPlugin implements Listener, CommandEx
             return true;
         }
         if (args[0].equalsIgnoreCase("list")) { player.sendMessage("ピアノ: " + String.join("、", new TreeSet<>(pianos.keySet()))); return true; }
+        if(args.length==1&&args[0].equalsIgnoreCase("create")){String generated="piano1";for(int i=1;pianos.containsKey(generated);i++)generated="piano"+(i+1);return onCommand(player,command,label,new String[]{"create",generated});}
         if (args.length < 2) { player.sendMessage("/piano で一覧を開けます。"); return true; }
         String name = args[1];
         if (args[0].equalsIgnoreCase("create")) {
             if (!player.hasPermission("kcraft.piano.create")) { player.sendMessage("設置は運営に依頼してください。"); return true; }
             if (!name.matches("[A-Za-z0-9_-]{1,24}")) { player.sendMessage("名前は半角英数字・_・-の1〜24文字です。"); return true; }
             if (pianos.size() >= Math.min(10,getConfig().getInt("max-pianos", 10))) { player.sendMessage("設置数の上限です。"); return true; }
-            var loc = player.getLocation().clone();
-            // Keep the entire model within one chunk, including at a Folia region boundary.
-            loc.setX((loc.getBlockX() >> 4) * 16 + 8); loc.setZ((loc.getBlockZ() >> 4) * 16 + 8); loc.setYaw(0); loc.setPitch(0);
+            var loc = placement(player);
             if (pianos.values().stream().anyMatch(p -> p.origin.getWorld().equals(loc.getWorld()) && p.origin.distanceSquared(loc) < 16)) {
-                player.sendMessage("この場所にはすでにピアノがあります。別のチャンクに設置してください。"); return true;
+                player.sendMessage("ピアノが重なるため、少し離れた場所を指定してください。"); return true;
             }
             var piano = new Piano(name, player.getUniqueId(), loc);
             if (pianos.putIfAbsent(name, piano) != null) { player.sendMessage("その名前は使用中です。"); return true; }
-            at(piano, piano::spawn); save(); player.sendMessage("ピアノ「" + name + "」をこのチャンクの中央に設置しました。/piano pack でモデルを表示できます。"); return true;
+            piano.spawn(); save(); player.sendMessage("ピアノ「" + name + "」を指定位置に設置しました。/piano pack でモデルを表示できます。"); return true;
         }
         Piano piano = pianos.get(name);
         if (piano == null) { player.sendMessage("そのピアノはありません。/piano list"); return true; }
@@ -135,17 +147,21 @@ public final class PianoPlugin extends JavaPlugin implements Listener, CommandEx
                 sessions.put(player.getUniqueId(), session); session.connect();
                 player.sendMessage("演奏画面に接続しています…");
             }
-            case "remove", "skin", "volume" -> {
+            case "remove", "remo", "delete", "move", "skin", "volume" -> {
                 if (!piano.owner.equals(player.getUniqueId()) && !player.hasPermission("kcraft.piano.admin")) { player.sendMessage("設置者か運営だけが変更できます。"); break; }
-                if (args[0].equalsIgnoreCase("remove")) {
+                if (Set.of("remove","remo","delete").contains(args[0].toLowerCase(Locale.ROOT))) {
                     pianos.remove(name, piano);
                     sessions.values().removeIf(s -> { if (s.piano != piano) return false; s.close(); return true; });
-                    at(piano, () -> { piano.removed = true; piano.destroy(); }); save(); player.sendMessage("ピアノを削除しました。");
+                    piano.destroy(); save(); player.sendMessage("ピアノを削除しました。");
+                } else if(args[0].equalsIgnoreCase("move")){
+                    Session active=piano.active.get();if(active!=null)active.close();
+                    Piano moved=new Piano(piano.name,piano.owner,placement(player));moved.slot=piano.slot;moved.skin=piano.skin;moved.volume=piano.volume;if(realtime!=null)moved.voice=realtime.voice(moved.origin,moved.slot);
+                    pianos.put(name,moved);piano.destroy();moved.spawn();save();player.sendMessage("指定位置へ移動しました。");
                 } else if (args.length < 3) player.sendMessage("/piano skin 名前 grand|upright|electric|closed または /piano volume 名前 0-100");
                 else if (args[0].equalsIgnoreCase("skin")) {
                     Integer model = Map.of("grand",167085,"upright",167087,"electric",167084,"closed",167086).get(args[2]);
                     if (model == null) player.sendMessage("種類: grand / upright / electric / closed");
-                    else { piano.skin = model; at(piano, () -> piano.body.getEquipment().setHelmet(item(model, Color.WHITE))); save(); player.sendMessage("ピアノの種類を変更しました。"); }
+                    else { piano.skin = model; piano.entity(piano.body,()->piano.body.setItemStack(item(model,Color.WHITE))); save(); player.sendMessage("ピアノの種類を変更しました。"); }
                 } else try { piano.volume = Math.max(0, Math.min(100, Integer.parseInt(args[2]))); save(); player.sendMessage("音量: " + piano.volume + "%"); }
                 catch (NumberFormatException e) { player.sendMessage("音量は0〜100です。"); }
             }
@@ -154,7 +170,7 @@ public final class PianoPlugin extends JavaPlugin implements Listener, CommandEx
         return true;
     }
     @Override public List<String> onTabComplete(CommandSender s, Command c, String a, String[] args) {
-        List<String> options = args.length == 1 ? List.of("connect","pack","list","create","remove","skin","volume") : args.length == 2 ? new ArrayList<>(pianos.keySet()) : args.length == 3 && args[0].equals("skin") ? List.of("grand","upright","electric","closed") : List.of();
+        List<String> options = args.length == 1 ? List.of("connect","pack","list","create","remove","move","skin","volume") : args.length == 2 ? new ArrayList<>(pianos.keySet()) : args.length == 3 && args[0].equals("skin") ? List.of("grand","upright","electric","closed") : List.of();
         return options.stream().filter(x -> x.startsWith(args[args.length-1])).sorted().toList();
     }
     private static final class Menu implements InventoryHolder { Inventory inventory; List<String> names; public Inventory getInventory() { return inventory; } }
@@ -174,75 +190,92 @@ public final class PianoPlugin extends JavaPlugin implements Listener, CommandEx
     }
     @EventHandler public void drag(InventoryDragEvent e) { if (e.getView().getTopInventory().getHolder() instanceof Menu) e.setCancelled(true); }
     @EventHandler public void click(PlayerInteractEvent e) {
+        if(e.getHand()!=null&&e.getHand()!=EquipmentSlot.HAND)return;
         if (!e.getAction().isLeftClick() && !e.getAction().isRightClick()) return;
         Player player = e.getPlayer(); if (!player.hasPermission("kcraft.piano.play")) return;
         long now=System.nanoTime(); Long last=clicks.get(player.getUniqueId()); if (last != null && now-last < 40_000_000) return;
         var eye = player.getEyeLocation(); var direction = eye.getDirection();
+        Piano selected=null;KeyboardGeometry.Hit nearest=null;
         for (var piano : pianos.values()) {
             if (!piano.origin.getWorld().equals(player.getWorld()) || piano.origin.distanceSquared(eye)>100) continue;
-            var hit = eye.toVector().clone();
-            for (double d=0; d<6; d+=0.025) {
-                hit.copy(eye.toVector()).add(direction.clone().multiply(d));
-                double x=hit.getX()-piano.origin.getX(), y=hit.getY()-piano.origin.getY(), z=hit.getZ()-piano.origin.getZ();
-                if (x < -1.5 || x > 1.1 || y < 1.55 || y > 1.8 || z<0.12 || z>0.55) continue;
-                int note = piano.hit(x,z); if (note<0) continue;
-                e.setCancelled(true); clicks.put(player.getUniqueId(), now);
-                at(piano, () -> { piano.note(note,100,null); Bukkit.getRegionScheduler().runDelayed(this,piano.origin,t -> piano.note(note,0,null),4); }); return;
-            }
+            if(!piano.ready)continue;
+            var hit=piano.hit(eye,direction);
+            if(hit!=null&&(nearest==null||hit.distance()<nearest.distance())){nearest=hit;selected=piano;}
         }
+        if(selected==null)return;
+        if(e.getClickedBlock()!=null&&eye.distanceSquared(e.getClickedBlock().getLocation().add(.5,.5,.5))<Math.pow(Math.max(0,nearest.distance()-.9),2))return;
+        e.setCancelled(true);clicks.put(player.getUniqueId(),now);Piano target=selected;int note=nearest.note();
+        if(realtime!=null)realtime.handle(target.voice,0,note,100,target.volume,null);
+        target.queueAnimation(note,100);
+        if(realtime==null)at(target,()->target.soundFallback(note,100,null));
+        Bukkit.getAsyncScheduler().runDelayed(this,t->{if(target.removed)return;if(realtime!=null)realtime.handle(target.voice,0,note,0,target.volume,null);else at(target,()->target.soundFallback(note,0,null));target.queueAnimation(note,0);},160,TimeUnit.MILLISECONDS);
+    }
+    private Location placement(Player player){
+        Location result=player.getLocation().clone();
+        org.bukkit.block.Block block=player.getTargetBlockExact(5,FluidCollisionMode.NEVER);
+        if(block!=null)result=block.getLocation().add(.5,1,.5);else{var forward=result.getDirection().setY(0);if(forward.lengthSquared()>0)result.add(forward.normalize().multiply(2));}
+        result.setYaw(player.getLocation().getYaw()+180);result.setPitch(0);return result;
     }
     private ItemStack item(int model, Color color) {
-        ItemStack item = new ItemStack(Material.LEATHER_HORSE_ARMOR); var meta=(LeatherArmorMeta)item.getItemMeta(); meta.setCustomModelData(model); meta.setColor(color); item.setItemMeta(meta); return item;
+        ItemStack item = new ItemStack(Material.LEATHER_HORSE_ARMOR); var meta=(LeatherArmorMeta)item.getItemMeta(); meta.setCustomModelData(model); meta.setColor(color);
+        String path=Map.of(167072,"bench",167075,"key/piano_black_key",167076,"key/piano_black_key_down",167077,"key/piano_key",167078,"key/piano_key_down",167084,"piano/electric_piano",167085,"piano/grand_piano",167086,"piano/grand_piano_close",167087,"piano/up_right_piano_close").get(model);
+        if(path!=null)meta.setItemModel(new NamespacedKey("kcraft",path));item.setItemMeta(meta);return item;
     }
     private final class Piano {
         final String name; final UUID owner; final Location origin;
-        final ArmorStand[] keys = new ArmorStand[88]; final double[] keyX = new double[88];
-        final boolean[] black = new boolean[88], pressed = new boolean[88];
+        final KeyboardGeometry geometry=new KeyboardGeometry();
+        final ItemDisplay[] keys=new ItemDisplay[88];
+        final boolean[] pressed=new boolean[88];
         final AtomicReference<Session> active=new AtomicReference<>();
         final AtomicIntegerArray nextAnimation=new AtomicIntegerArray(88);
         final AtomicBoolean animationScheduled=new AtomicBoolean();
-        ArmorStand body; final List<ArmorStand> models = new ArrayList<>();
-        volatile int skin=167085, volume=70; volatile boolean removed; volatile boolean sustain; int slot; RealtimeAudio.Voice voice;
-        Piano(String name, UUID owner, Location origin) { this.name=name; this.owner=owner; this.origin=origin.clone();var slots=pianos.values().stream().map(p->p.slot).toList();while(slots.contains(slot))slot++;if(realtime!=null)voice=new RealtimeAudio.Voice(this.origin,slot);for(int i=0;i<88;i++)nextAnimation.set(i,-1); }
-        ArmorStand model(Location loc, int id, boolean small, Color color) {
-            ArmorStand stand=loc.getWorld().spawn(loc, ArmorStand.class, a -> { a.setVisible(false); a.setGravity(false); a.setMarker(true); a.setSmall(small); a.setPersistent(false); a.setInvulnerable(true); a.setSilent(true); a.getPersistentDataContainer().set(tag,PersistentDataType.STRING,name); a.getEquipment().setHelmet(item(id,color)); });
-            models.add(stand); return stand;
+        volatile ItemDisplay body; final List<ItemDisplay> models=new CopyOnWriteArrayList<>();
+        final Set<Long> chunks=ConcurrentHashMap.newKeySet();
+        volatile int skin=167085,volume=70;volatile boolean removed,ready;volatile boolean sustain;int slot;RealtimeAudio.Voice voice;
+        Piano(String name,UUID owner,Location origin){this.name=name;this.owner=owner;this.origin=origin.clone();var slots=pianos.values().stream().map(p->p.slot).toList();while(slots.contains(slot))slot++;if(realtime!=null)voice=realtime.voice(this.origin,slot);for(int i=0;i<88;i++)nextAnimation.set(i,-1);}
+        Location position(double x,double y,double z){double a=Math.toRadians(origin.getYaw()),c=Math.cos(a),v=Math.sin(a);Location location=origin.clone().add(c*x-v*z,y,v*x+c*z);location.setPitch(0);return location;}
+        void entity(ItemDisplay display,Runnable action){if(display==null)return;if(Bukkit.isOwnedByCurrentRegion(display))action.run();else display.getScheduler().execute(PianoPlugin.this,action,null,1);}
+        CompletableFuture<ItemDisplay> model(Location loc,int id,Color color,Vector3f offset,Vector3f scale){
+            var result=new CompletableFuture<ItemDisplay>();
+            Runnable create=()->{
+                if(removed){result.complete(null);return;}
+                try{ItemDisplay display=loc.getWorld().spawn(loc,ItemDisplay.class,e->{e.setItemStack(item(id,color));e.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.NONE);e.setPersistent(false);e.setInvulnerable(true);e.setSilent(true);e.setDisplayWidth(8);e.setDisplayHeight(6);e.setInterpolationDuration(0);e.setTeleportDuration(0);e.setTransformation(new Transformation(offset,new Quaternionf(),scale,new Quaternionf()));e.getPersistentDataContainer().set(tag,PersistentDataType.STRING,name);});models.add(display);result.complete(display);}
+                catch(Throwable error){result.completeExceptionally(error);}
+            };
+            if(Bukkit.isOwnedByCurrentRegion(loc))create.run();else Bukkit.getRegionScheduler().execute(PianoPlugin.this,loc,create);
+            return result;
         }
-        void spawn() {
-            if (body != null) return;
-            origin.getChunk().addPluginChunkTicket(PianoPlugin.this);
-            body=model(origin,skin,false,Color.WHITE);
-            double x=-1.5;
-            for (int n=21;n<=108;n++) {
-                int i=n-21, pc=n%12; black[i]=pc==1||pc==3||pc==6||pc==8||pc==10;
-                keyX[i]=x+(black[i]?0.025:0.05);
-                keys[i]=model(origin.clone().add(keyX[i],black[i]?1.12:1.1,black[i]?0.25:0.3),black[i]?167075:167077,true,black[i]?Color.fromRGB(22,22,22):Color.WHITE);
-                if (!black[i]) x+=0.05;
+        void spawn(){
+            if(removed||ready)return;
+            List<CompletableFuture<Void>> cleanup=new ArrayList<>();
+            int minX=(int)Math.floor(origin.getX()-4)>>4,maxX=(int)Math.floor(origin.getX()+4)>>4,minZ=(int)Math.floor(origin.getZ()-4)>>4,maxZ=(int)Math.floor(origin.getZ()+4)>>4;
+            for(int x=minX;x<=maxX;x++)for(int z=minZ;z<=maxZ;z++){
+                int cx=x,cz=z;var done=new CompletableFuture<Void>();cleanup.add(done);
+                Bukkit.getRegionScheduler().execute(PianoPlugin.this,origin.getWorld(),cx,cz,()->{
+                    try{if(removed){done.complete(null);return;}Chunk chunk=origin.getWorld().getChunkAt(cx,cz);chunk.addPluginChunkTicket(PianoPlugin.this);chunks.add(((long)cx<<32)^(cz&0xffffffffL));for(Entity old:chunk.getEntities())if(name.equals(old.getPersistentDataContainer().get(tag,PersistentDataType.STRING)))old.remove();done.complete(null);}
+                    catch(Throwable error){done.completeExceptionally(error);}
+                });
             }
-            model(origin.clone().add(-0.2,-0.65,1.1),167072,true,Color.WHITE);
+            CompletableFuture.allOf(cleanup.toArray(CompletableFuture[]::new)).thenCompose(ignored->{
+                List<CompletableFuture<?>> created=new ArrayList<>();
+                created.add(model(origin,skin,Color.WHITE,new Vector3f(.16875f,.9f,.2f),new Vector3f(1.8f)).thenAccept(e->body=e));
+                for(int i=0;i<88;i++){int index=i;created.add(model(position(geometry.x[i],geometry.floor(i),geometry.centerZ(i)),geometry.black[i]?167075:167077,geometry.black[i]?Color.fromRGB(22,22,22):Color.WHITE,new Vector3f(0,.1f,0),new Vector3f(.2f,.2f,(float)geometry.depthScale(i))).thenAccept(e->keys[index]=e));}
+                created.add(model(position(0,0,1.05),167072,Color.WHITE,new Vector3f(0,.5f,0),new Vector3f(1)));
+                return CompletableFuture.allOf(created.toArray(CompletableFuture[]::new));
+            }).whenComplete((ignored,error)->{if(error!=null)getLogger().severe("Model creation failed "+name+": "+error);else{ready=!removed;getLogger().info("MODEL READY name="+name+" pieces="+models.size()+" yaw="+origin.getYaw());}});
         }
-        int hit(double x, double z) {
-            for (int pass=0;pass<2;pass++) for (int i=0;i<88;i++) if (black[i]==(pass==0) && Math.abs(x-keyX[i])<(black[i]?0.018:0.028) && (!black[i]||z<0.34)) return i+21;
-            return -1;
+        KeyboardGeometry.Hit hit(Location eye,org.bukkit.util.Vector direction){
+            double a=Math.toRadians(origin.getYaw()),c=Math.cos(a),v=Math.sin(a),x=eye.getX()-origin.getX(),z=eye.getZ()-origin.getZ();
+            return geometry.ray(c*x+v*z,eye.getY()-origin.getY(),-v*x+c*z,c*direction.getX()+v*direction.getZ(),direction.getY(),-v*direction.getX()+c*direction.getZ(),6);
         }
-        void note(int note,int velocity,UUID performer) {
-            if (removed || body==null || note<21||note>108) return;
-            animate(note,velocity);
-            if(realtime!=null){realtime.handle(voice,0,note,velocity,volume,performer);return;}
-            soundFallback(note,velocity,performer);
-        }
+        void note(int note,int velocity,UUID performer){if(removed||note<21||note>108)return;animate(note,velocity);if(realtime!=null)realtime.handle(voice,0,note,velocity,volume,performer);else soundFallback(note,velocity,performer);}
         void animate(int note,int velocity){
-            if(removed||body==null)return;
-            int i=note-21; pressed[i]=velocity>0;
-            keys[i].getEquipment().setHelmet(item(black[i]?(velocity>0?167076:167075):(velocity>0?167078:167077),velocity>0?Color.fromRGB(76,151,220):black[i]?Color.fromRGB(22,22,22):Color.WHITE));
+            if(removed)return;int i=note-21;pressed[i]=velocity>0;
+            ItemDisplay key=keys[i];if(key==null)return;boolean black=geometry.black[i];
+            ItemStack stack=item(black?(velocity>0?167076:167075):(velocity>0?167078:167077),velocity>0?Color.fromRGB(76,151,220):black?Color.fromRGB(22,22,22):Color.WHITE);
+            entity(key,()->key.setItemStack(stack));
         }
-        void queueAnimation(int note,int velocity){
-            nextAnimation.set(note-21,velocity);
-            if(animationScheduled.compareAndSet(false,true))at(this,()->{
-                animationScheduled.set(false);
-                for(int i=0;i<88;i++){int v=nextAnimation.getAndSet(i,-1);if(v>=0)animate(i+21,v);}
-            });
-        }
+        void queueAnimation(int note,int velocity){nextAnimation.set(note-21,velocity);if(animationScheduled.compareAndSet(false,true))at(this,()->{animationScheduled.set(false);for(int i=0;i<88;i++){int v=nextAnimation.getAndSet(i,-1);if(v>=0)animate(i+21,v);}});}
         void soundFallback(int note,int velocity,UUID performer){
             // Send each recipient's sound on that recipient's entity owner thread.
             // No global-region task and no unbounded note queue.
@@ -264,7 +297,11 @@ public final class PianoPlugin extends JavaPlugin implements Listener, CommandEx
         }
         void resetKeys(){for(int i=0;i<88;i++){nextAnimation.set(i,-1);if(pressed[i])animate(i+21,0);}}
         void pedal(boolean down) { if(realtime!=null){realtime.handle(voice,1,0,down?127:0,volume,null);return;}boolean previous=sustain; sustain=down; if(previous&&!down){boolean[] held=pressed.clone();for(Player listener:players.values()) onPlayer(listener,()->{if(listener.getWorld().equals(origin.getWorld())&&listener.getLocation().distanceSquared(origin)<=range*range)for(int n=21;n<=108;n++)if(!held[n-21])listener.stopSound("minecraft:1c."+n,SoundCategory.RECORDS);});} }
-        void destroy() { panic(); for (ArmorStand model:models) model.remove(); models.clear(); origin.getChunk().removePluginChunkTicket(PianoPlugin.this); }
+        void destroy(){
+            if(removed)return;panic();removed=true;ready=false;
+            for(ItemDisplay display:models)entity(display,display::remove);models.clear();
+            for(long key:chunks){int x=(int)(key>>32),z=(int)key;Bukkit.getRegionScheduler().execute(PianoPlugin.this,origin.getWorld(),x,z,()->origin.getWorld().getChunkAt(x,z).removePluginChunkTicket(PianoPlugin.this));}chunks.clear();
+        }
     }
     private final class Session implements WebSocket.Listener {
         final UUID player; final Piano piano; final String token;
@@ -272,6 +309,7 @@ public final class PianoPlugin extends JavaPlugin implements Listener, CommandEx
         final AtomicInteger pending=new AtomicInteger();
         final java.io.ByteArrayOutputStream fragments = new java.io.ByteArrayOutputStream(16);
         volatile WebSocket socket; volatile boolean closed;
+        volatile long probeSent;
         CompletableFuture<WebSocket> outgoing=CompletableFuture.completedFuture(null);
         final AtomicInteger outgoingCount=new AtomicInteger();
         Session(UUID player,Piano piano) { this.player=player; this.piano=piano; byte[] bytes=new byte[32];random.nextBytes(bytes);token=Base64.getUrlEncoder().withoutPadding().encodeToString(bytes); }
@@ -284,9 +322,11 @@ public final class PianoPlugin extends JavaPlugin implements Listener, CommandEx
         }
         public void onOpen(WebSocket ws) {
             socket=ws;if(closed){ws.abort();return;} ws.request(1);
+            // Warm the relay before the first MIDI note; serialize with later binary sends.
+            probeSent=System.nanoTime();outgoing=ws.sendText("ping",true);
             Player p=players.get(player);if(p!=null)onPlayer(p,()->p.sendMessage(Component.text("▶ 「"+piano.name+"」の演奏画面を開く（接続URLは共有しないでください）").clickEvent(ClickEvent.openUrl(web+"/#session="+token))));
         }
-        public CompletionStage<?> onText(WebSocket ws,CharSequence data,boolean last) { ws.request(1);return null; }
+        public CompletionStage<?> onText(WebSocket ws,CharSequence data,boolean last) { if(getConfig().getBoolean("latency-probe",false)&&last&&data.toString().equals("pong")&&probeSent!=0)getLogger().info("BRIDGE PROBE ms="+(System.nanoTime()-probeSent)/1_000_000d);ws.request(1);return null; }
         public CompletionStage<?> onBinary(WebSocket ws,ByteBuffer data,boolean last) {
             int size=data.remaining();
             if(fragments.size()+size>16){close();return null;}
@@ -327,7 +367,7 @@ public final class PianoPlugin extends JavaPlugin implements Listener, CommandEx
     }
     private void save() {
         var yaml=new YamlConfiguration();
-        for(var p:pianos.values()){String n=p.name+".";yaml.set(n+"owner",p.owner.toString());yaml.set(n+"world",p.origin.getWorld().getName());yaml.set(n+"x",p.origin.getX());yaml.set(n+"y",p.origin.getY());yaml.set(n+"z",p.origin.getZ());yaml.set(n+"skin",p.skin);yaml.set(n+"volume",p.volume);yaml.set(n+"slot",p.slot);}
+        for(var p:pianos.values()){String n=p.name+".";yaml.set(n+"owner",p.owner.toString());yaml.set(n+"world",p.origin.getWorld().getName());yaml.set(n+"x",p.origin.getX());yaml.set(n+"y",p.origin.getY());yaml.set(n+"z",p.origin.getZ());yaml.set(n+"skin",p.skin);yaml.set(n+"volume",p.volume);yaml.set(n+"slot",p.slot);yaml.set(n+"yaw",p.origin.getYaw());}
         pendingSave=yaml.saveToString();
         if(running)Bukkit.getAsyncScheduler().runNow(this,t->{synchronized(saveLock){flushSave();}});
     }

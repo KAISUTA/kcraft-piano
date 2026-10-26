@@ -1,0 +1,10 @@
+{
+  "recoveryTimeJst": "2026-10-26 20:15:43",
+  "staleHandlerRemoved": 1,
+  "recoveryFailures": 0,
+  "postRecoveryStaleLoaderErrors": 0,
+  "newLoginsAfterRecovery": 37,
+  "bedrockLoginsAfterRecovery": 24,
+  "liveJarSha256": "332d55a07460b36534c6f01d95bfc4a0408260ded9717933ec9f092a2c187545",
+  "failedPacketEventsJarArchived": true
+}

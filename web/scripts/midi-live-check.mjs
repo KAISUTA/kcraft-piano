@@ -1,0 +1,24 @@
+import { chromium } from 'playwright';
+import assert from 'node:assert/strict';
+import {mkdir,writeFile}from'node:fs/promises';
+const browser=await chromium.launch({executablePath:'C:/Users/User/AppData/Local/ms-playwright/chromium-1243/chrome-win64/chrome.exe',headless:true});
+const page=await browser.newPage();
+await page.addInitScript(()=>{
+  const input={id:'test-usb',name:'USB MIDI test fixture',state:'connected',connection:'closed',onmidimessage:null,open:async()=>{input.connection='open';return input;}};
+  const access={inputs:new Map([[input.id,input]]),onstatechange:null};
+  Object.defineProperty(navigator,'requestMIDIAccess',{value:async()=>access,configurable:true});
+  window.__midi={send(data){input.onmidimessage?.({data:new Uint8Array(data),receivedTime:performance.now()});},disconnect(){input.state='disconnected';access.onstatechange?.({port:input});}};
+  window.__starts=0;const original=AudioBufferSourceNode.prototype.start;AudioBufferSourceNode.prototype.start=function(...args){window.__starts++;return original.apply(this,args);};
+});
+await page.goto('https://kcraft-piano.kaisuta-works.workers.dev/');await page.getByRole('button',{name:'MIDIキーボードを接続'}).click();
+await page.waitForFunction(()=>document.querySelector('#midi-state').textContent==='接続済み',null,{timeout:45000});
+assert.equal(await page.locator('#midi-device').textContent(),'USB MIDI test fixture');
+await page.evaluate(()=>{__midi.send([0x90,60,20]);__midi.send([0x90,64,64]);__midi.send([0x90,67,127]);});await page.waitForTimeout(60);
+assert.equal(await page.locator('.key.active').count(),3);assert.equal(await page.locator('#midi-count').textContent(),'3');assert.equal(await page.locator('#midi-velocity').textContent(),'127');
+await page.evaluate(()=>window.dispatchEvent(new Event('blur')));await page.waitForTimeout(40);assert.equal(await page.locator('.key.active').count(),3,'MIDI chord must survive switching to Minecraft');
+await page.evaluate(()=>{__midi.send([0xb0,64,127]);__midi.send([0x80,60,0]);__midi.send([0x90,64,0]);__midi.send([0x80,67,0]);});await page.waitForTimeout(40);
+assert.equal(await page.locator('.key.active').count(),0);assert.equal(await page.locator('#pedal-led').getAttribute('class'),'on');
+await page.evaluate(()=>{__midi.send([0xb0,64,0]);__midi.send([0x90,72,80]);__midi.send([0x90,72,100]);});await page.waitForTimeout(40);assert.equal(await page.locator('.key.active').count(),1);assert.equal(await page.evaluate(()=>__starts),5,'Repeated NoteOn should retrigger immediately');
+await page.evaluate(()=>__midi.disconnect());await page.waitForTimeout(50);assert.equal(await page.locator('.key.active').count(),0);assert.equal(await page.locator('#midi-state').textContent(),'未接続');
+const result={simulatedWebMidiMessages:true,chord:true,velocity:true,sustain:true,noteOnZeroVelocityOff:true,backgroundWhileMinecraftFocused:true,retrigger:true,disconnectCleanup:true,physicalDeviceTested:false};
+await mkdir('test-output',{recursive:true});await writeFile('test-output/midi-live.json',JSON.stringify(result,null,2));console.log(JSON.stringify(result));await browser.close();

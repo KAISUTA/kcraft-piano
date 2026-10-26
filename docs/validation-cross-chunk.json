@@ -1,0 +1,12 @@
+{
+  "crossChunkPiano": {
+    "world": "world",
+    "x": 15.9,
+    "y": -60.0,
+    "z": 14.5,
+    "skin": 167085,
+    "volume": 70,
+    "slot": 1,
+    "yaw": 180.0
+  }
+}

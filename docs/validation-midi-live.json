@@ -1,0 +1,11 @@
+{
+  "simulatedWebMidiMessages": true,
+  "chord": true,
+  "velocity": true,
+  "sustain": true,
+  "noteOnZeroVelocityOff": true,
+  "backgroundWhileMinecraftFocused": true,
+  "retrigger": true,
+  "disconnectCleanup": true,
+  "physicalDeviceTested": false
+}

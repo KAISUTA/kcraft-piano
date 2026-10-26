@@ -7,16 +7,17 @@
 <div class="controls">
   <button id="start" class="primary">音を有効にする</button>
   <div class="control"><label for="volume">手元の音量 <output id="volume-value">65%</output></label><input id="volume" type="range" min="0" max="100" value="65"></div>
-  <div class="control midi-control"><label for="midi">MIDI入力</label><div class="input-row"><select id="midi"><option value="">PCキーボード・タッチ</option></select><button id="midi-enable">接続</button></div></div>
+  <div class="control midi-control"><label for="midi">MIDIキーボード</label><div class="input-row"><select id="midi"><option value="">MIDI機器を選択</option></select><button id="midi-enable">MIDIキーボードを接続</button></div></div>
   <button id="panic" class="quiet">すべて消音</button>
 </div>
 <p id="status" role="status">音を有効にすると、PCキーボード・タッチで演奏できます。</p>
 <section class="piano" aria-label="ピアノ鍵盤"><div class="piano-top"><span>GRAND PIANO</span><div class="pedal-label"><i id="pedal-led"></i> サステイン <kbd>Space</kbd></div></div><div id="keyboard-scroll"><div id="keyboard" role="group" aria-label="88鍵"></div></div><div class="piano-bottom"><span>A0</span><span id="note-display">—</span><span>C8</span></div></section>
 <div class="below-piano"><p><kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> <kbd>F</kbd> <kbd>G</kbd> <kbd>H</kbd> <kbd>J</kbd> <kbd>K</kbd> で白鍵 · <kbd>W</kbd> <kbd>E</kbd> <kbd>T</kbd> <kbd>Y</kbd> <kbd>U</kbd> で黒鍵</p><div class="octave"><button id="octave-down" aria-label="1オクターブ下げる">−</button><span id="octave-label">中央 C4</span><button id="octave-up" aria-label="1オクターブ上げる">＋</button></div></div>
 <div class="workspace">
-<section class="midi-file"><div class="section-title"><h2>MIDIファイル</h2><label class="file-label" for="file">ファイルを選ぶ<input type="file" id="file" accept=".mid,.midi,audio/midi"></label></div><p id="file-name">.mid / .midi を読み込んで自動演奏</p><div class="playback"><button id="play" disabled>再生</button><button id="stop" disabled>停止</button><input type="range" id="progress" min="0" max="1000" value="0" disabled aria-label="再生位置"><span id="time">0:00 / 0:00</span></div></section>
+<section class="midi-live"><div class="section-title"><h2>MIDIキーボードでリアルタイム演奏</h2><span id="midi-state">未接続</span></div><p id="midi-device">USB接続した鍵盤を、上のボタンから接続してください。</p><dl><div><dt>入力した音</dt><dd><b id="midi-note">—</b></dd></div><div><dt>打鍵の強さ</dt><dd><b id="midi-velocity">—</b><small>/127</small></dd></div><div><dt>受信した打鍵</dt><dd><b id="midi-count">0</b></dd></div></dl><p>和音・打鍵の強さ・サステインペダルに対応。Minecraftを操作している間もMIDI入力は続きます。</p></section>
 <section class="latency"><div class="section-title"><h2>遅延を確認</h2><span id="measurement-state">未計測</span></div><dl><div><dt>音声出力の目安</dt><dd><b id="audio-latency">—</b><small>ms</small></dd></div><div><dt>Minecraft往復</dt><dd><b id="rtt">—</b><small>ms</small></dd></div><div><dt>サーバー内処理</dt><dd><b id="server-latency">—</b><small>ms</small></dd></div></dl><p>音声出力はブラウザの推定値。Minecraft往復はサーバーの発音処理までの応答時間で、実際に耳へ届く時間とは異なります。</p></section>
 </div>
+<details class="help midi-file"><summary>MIDIファイルの自動演奏（補助機能）</summary><div class="section-title"><h2>MIDIファイル</h2><label class="file-label" for="file">ファイルを選ぶ<input type="file" id="file" accept=".mid,.midi,audio/midi"></label></div><p id="file-name">.mid / .midi を読み込んで自動演奏</p><div class="playback"><button id="play" disabled>再生</button><button id="stop" disabled>停止</button><input type="range" id="progress" min="0" max="1000" value="0" disabled aria-label="再生位置"><span id="time">0:00 / 0:00</span></div></details>
 <details class="help"><summary>Minecraftで演奏する</summary><p>ゲーム内で <code>/piano</code> を開き、ピアノを選んで表示されたリンクへ進んでください。モデルと音源は <code>/piano pack</code> で適用できます。接続URLは自分専用です。</p><p>手元の音は通信を待たずに鳴ります。Minecraft内では近くのプレイヤーに音が届きます。ヘッドホンを使い、Bluetoothを避けると機器側の遅延を減らせます。</p></details>
-</main><footer><span>K-Craft Piano · Folia edition</span><a href="/credits.html">原作者・音源・ライセンス</a><a href="/downloads/kcraft-piano-folia-2.0.0.jar">プラグインをダウンロード</a></footer>
+</main><footer><span>K-Craft Piano · Folia edition</span><a href="/credits.html">原作者・音源・ライセンス</a><a href="/downloads/kcraft-piano-folia-2.1.0.jar">プラグインをダウンロード</a></footer>
 <script type="module" src="/app.js"></script></body></html>
