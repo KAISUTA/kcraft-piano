@@ -1,0 +1,48 @@
+{
+  "timestamp": "2026-10-26T15:58:30.646Z",
+  "minecraft": "Folia 26.2",
+  "acks": 101,
+  "roundTripMs": {
+    "count": 101,
+    "min": 18.6304999999993,
+    "p50": 23.95379999999932,
+    "p95": 29.090899999999237,
+    "max": 30.332800000000134
+  },
+  "serverDispatchMs": {
+    "count": 101,
+    "min": 0.000651,
+    "p50": 0.013411,
+    "p95": 0.07857,
+    "max": 0.197753
+  },
+  "packets": {
+    "entity_status": 1,
+    "entity_metadata": 1356,
+    "entity_update_attributes": 151,
+    "spawn_entity": 553,
+    "sync_entity_position": 1152,
+    "entity_velocity": 1987,
+    "entity_head_rotation": 329,
+    "rel_entity_move": 2204,
+    "sound_effect": 84,
+    "entity_equipment": 9,
+    "entity_look": 119,
+    "entity_move_look": 105,
+    "entity_destroy": 198,
+    "stop_sound": 40
+  },
+  "observerSoundPackets": 151,
+  "observerSoundPacketNames": [
+    "sound_effect",
+    "stop_sound"
+  ],
+  "customPianoNoteOns": 40,
+  "customPianoStops": 40,
+  "performerNoteOns": 40,
+  "performerStops": 40,
+  "burstAcknowledged": 500,
+  "risingKeys": 37,
+  "risingKeysCleaned": 37,
+  "benchSeated": true
+}

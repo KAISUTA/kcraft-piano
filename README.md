@@ -1,17 +1,24 @@
 # K-Craft Piano / Folia edition
 
-[演奏画面](https://kcraft-piano.kaisuta-works.workers.dev/) · [JAR](https://kcraft-piano.kaisuta-works.workers.dev/downloads/kcraft-piano-folia-2.2.0.jar) · [リソースパック](https://kcraft-piano.kaisuta-works.workers.dev/downloads/kcraft-piano-pack.zip)
+[演奏画面](https://kcraft-piano.kaisuta-works.workers.dev/) · [JAR](https://kcraft-piano.kaisuta-works.workers.dev/downloads/kcraft-piano-folia-2.3.0.jar) · [リソースパック](https://kcraft-piano.kaisuta-works.workers.dev/downloads/kcraft-piano-pack.zip)
 
 [jwdeveloper/JW_Piano](https://github.com/jwdeveloper/JW_Piano) のFolia向けフォーク。原版のピアノモデル・テクスチャ・88鍵の音源・鍵盤配置を継承し、日本語のゲーム内操作とブラウザ演奏を追加しました。
 
 原版の公開終了したFluentAPIには依存しません。実行するコードは `folia/`、Web画面とCloudflare中継は `web/` です。ルートの `src/` と `pom.upstream.xml` は原版の履歴・参照用として残しています。ルートの `mvn package` でもFolia版をビルドできます。原版の説明は [README.upstream.md](README.upstream.md) です。
+
+## 2.3.0の変更
+
+- 弾いた鍵盤の残像が約1.6秒かけて3ブロック上昇し、消える演出を追加。音声送信と分離し、最大128個/台で制限します。
+- GSitを利用したベンチへの着席。右クリックまたは `/piano sit 名前`、スニークで退出します。
+- 統合版の表示・音声に対応する専用パック、Geyserカスタムアイテム定義、GeyserDisplayEntity設定を追加。[統合版導入手順](bedrock/README.md)を参照してください。
+- テストクライアントで鍵盤の上昇・全件削除、GSitへの乗車、Bedrockのモデル装備と発音/消音パケットを確認。実機の画面・スピーカー出力は未確認です。
 
 ## 2.2.0の変更
 
 - 毎回のセッションURL・60分制限・プレイヤー退出による失効を廃止。固定ページで固定パスワードを入力し、ピアノを選びます。
 - 各ピアノが自動で常設WebSocketを接続し、切断時は再接続します。ブラウザの認証はHttpOnly Cookieに30日保存します。
 - 裏画面への切替でMIDIファイルを停止する処理を削除。AudioWorkletの音声時計で再生を継続し、USB MIDI入力も維持します。
-- Java版の参加者へパックを自動追加。KCraftGuideの `kcraft_touring` が有効な間は待ち、終了後に適用します。案内パックを置き換えません。統合版へJavaパックは送信しません。
+- Java版の参加者へパックを自動追加。KCraftGuideの `kcraft_touring` が有効な間は待ち、終了後に適用します。案内パックを置き換えません。統合版にはGeyser経由で専用パックを配布し、Javaパックは送信しません。
 
 ## 2.1.1の修正
 
@@ -61,7 +68,7 @@ Chromiumでの打鍵イベント → AudioBufferSourceNode.start呼出しは中�
 
 - Paper/Folia 1.21.4以降向けのAPIでビルド。実機検証はFolia 26.2。Minecraft本体が要求するJavaを使用してください（26.2はJava 25）。
 - **2.1.0以降はPacketEvents不要です。** 既存のサーバー接続に音声パケットだけを送信します。高速経路はFolia 26.2で検証済み。対象APIが見つからない版では標準のFoliaスケジューラ経由に切り替えます。
-- `kcraft-piano-folia-2.2.0.jar` を `plugins/` へ配置します。2.1.0は接続中プレイヤーがいる状態でのPlugMan入れ替えを検証しています。サーバー全体の再起動は運営者の許可を得てから行ってください。
+- `kcraft-piano-folia-2.3.0.jar` を `plugins/` へ配置します。2.1.0は接続中プレイヤーがいる状態でのPlugMan入れ替えを検証しています。サーバー全体の再起動は運営者の許可を得てから行ってください。
 
 `plugins/KCraftPiano/config.yml`:
 
@@ -88,6 +95,7 @@ mute-performer-in-game: false
 | `/piano connect 名前` | 32ブロック以内から固定演奏ページを開く |
 | `/piano pack` | Java版のモデル・音源パックを適用 |
 | `/piano list` | 一覧 |
+| `/piano sit 名前` | ベンチに座る（GSitが必要） |
 | `/piano skin 名前 grand/upright/electric/closed` | 外観を変更 |
 | `/piano volume 名前 0-100` | ゲーム内音量を変更 |
 | `/piano remove 名前` | 削除（設置者か運営） |
@@ -100,7 +108,7 @@ PCのA/S/D/F/G/H/J/Kが白鍵、W/E/T/Y/Uが黒鍵、Spaceがサステイン。�
 
 - 新しい実行部は旧デスクトップアプリ、FluentAPI/PianoApi、旧保存形式とは互換ではありません。既存JW_Pianoのデータは自動移行せず、別プラグイン名/設定フォルダを使います。
 - MIDI曲の管理・再生はWeb側へ移しました。原版の自動ピアニスト、ベンチの移動・着席、粒子エフェクト選択などは新ランタイムに移植していません。
-- リソースパックはJavaクライアント用。Bedrock向けのモデル・音源変換は含みません。既存のサーバーパックと併用する場合、leather_horse_armorのアイテム定義は必要に応じて統合してください。サーバー全体の既存resource-pack設定は変更しません。
+- リソースパックはJavaクライアント用。Bedrock向けの専用モデル・音源パックは `bedrock/` の手順で導入します。既存のサーバーパックと併用する場合、leather_horse_armorのアイテム定義は必要に応じて統合してください。サーバー全体の既存resource-pack設定は変更しません。
 - 音が届く距離は32ブロック既定。モデルごとに所有リージョンを使うため、チャンク中央への固定はありません。最大10台。それぞれ別のサウンド名を使い、別ピアノの同音を消さないようにしています。
 - 高速音声経路で使うプレイヤー位置は、本人のスレッド上で移動イベントから公開したスナップショットです。音声経路からワールド/プレイヤーデータを直接読まず、所有スレッドで取得しておいた接続へ、音声パケットだけを送信します。
 

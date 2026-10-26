@@ -1,0 +1,161 @@
+{
+  "format_version": 2,
+  "items": {
+    "minecraft:leather_horse_armor": [
+      {
+        "type": "definition",
+        "bedrock_identifier": "geyser_custom:bench",
+        "display_name": "Bench",
+        "bedrock_options": {
+          "icon": "kcraft_bench_icon",
+          "display_handheld": false,
+          "allow_offhand": true
+        },
+        "model": "kcraft:bench"
+      },
+      {
+        "type": "definition",
+        "bedrock_identifier": "geyser_custom:flyingnote",
+        "display_name": "Flyingnote",
+        "bedrock_options": {
+          "icon": "kcraft_flyingnote_icon",
+          "display_handheld": false,
+          "allow_offhand": true
+        },
+        "model": "kcraft:flyingnote"
+      },
+      {
+        "type": "definition",
+        "bedrock_identifier": "geyser_custom:icons_icon",
+        "display_name": "Icon",
+        "bedrock_options": {
+          "icon": "kcraft_icons_icon_icon",
+          "display_handheld": false,
+          "allow_offhand": true
+        },
+        "model": "kcraft:icons/icon"
+      },
+      {
+        "type": "definition",
+        "bedrock_identifier": "geyser_custom:key_piano_black_key",
+        "display_name": "Piano Black Key",
+        "bedrock_options": {
+          "icon": "kcraft_key_piano_black_key_icon",
+          "display_handheld": false,
+          "allow_offhand": true
+        },
+        "model": "kcraft:key/piano_black_key"
+      },
+      {
+        "type": "definition",
+        "bedrock_identifier": "geyser_custom:key_piano_black_key_down",
+        "display_name": "Piano Black Key Down",
+        "bedrock_options": {
+          "icon": "kcraft_key_piano_black_key_down_icon",
+          "display_handheld": false,
+          "allow_offhand": true
+        },
+        "model": "kcraft:key/piano_black_key_down"
+      },
+      {
+        "type": "definition",
+        "bedrock_identifier": "geyser_custom:key_piano_key",
+        "display_name": "Piano Key",
+        "bedrock_options": {
+          "icon": "kcraft_key_piano_key_icon",
+          "display_handheld": false,
+          "allow_offhand": true
+        },
+        "model": "kcraft:key/piano_key"
+      },
+      {
+        "type": "definition",
+        "bedrock_identifier": "geyser_custom:key_piano_key_down",
+        "display_name": "Piano Key Down",
+        "bedrock_options": {
+          "icon": "kcraft_key_piano_key_down_icon",
+          "display_handheld": false,
+          "allow_offhand": true
+        },
+        "model": "kcraft:key/piano_key_down"
+      },
+      {
+        "type": "definition",
+        "bedrock_identifier": "geyser_custom:pianist_pianist_body",
+        "display_name": "Pianist Body",
+        "bedrock_options": {
+          "icon": "kcraft_pianist_pianist_body_icon",
+          "display_handheld": false,
+          "allow_offhand": true
+        },
+        "model": "kcraft:pianist/pianist_body"
+      },
+      {
+        "type": "definition",
+        "bedrock_identifier": "geyser_custom:pianist_pianist_hands",
+        "display_name": "Pianist Hands",
+        "bedrock_options": {
+          "icon": "kcraft_pianist_pianist_hands_icon",
+          "display_handheld": false,
+          "allow_offhand": true
+        },
+        "model": "kcraft:pianist/pianist_hands"
+      },
+      {
+        "type": "definition",
+        "bedrock_identifier": "geyser_custom:pianist_pianist_head",
+        "display_name": "Pianist Head",
+        "bedrock_options": {
+          "icon": "kcraft_pianist_pianist_head_icon",
+          "display_handheld": false,
+          "allow_offhand": true
+        },
+        "model": "kcraft:pianist/pianist_head"
+      },
+      {
+        "type": "definition",
+        "bedrock_identifier": "geyser_custom:piano_electric_piano",
+        "display_name": "Electric Piano",
+        "bedrock_options": {
+          "icon": "kcraft_piano_electric_piano_icon",
+          "display_handheld": false,
+          "allow_offhand": true
+        },
+        "model": "kcraft:piano/electric_piano"
+      },
+      {
+        "type": "definition",
+        "bedrock_identifier": "geyser_custom:piano_grand_piano",
+        "display_name": "Grand Piano",
+        "bedrock_options": {
+          "icon": "kcraft_piano_grand_piano_icon",
+          "display_handheld": false,
+          "allow_offhand": true
+        },
+        "model": "kcraft:piano/grand_piano"
+      },
+      {
+        "type": "definition",
+        "bedrock_identifier": "geyser_custom:piano_grand_piano_close",
+        "display_name": "Grand Piano Close",
+        "bedrock_options": {
+          "icon": "kcraft_piano_grand_piano_close_icon",
+          "display_handheld": false,
+          "allow_offhand": true
+        },
+        "model": "kcraft:piano/grand_piano_close"
+      },
+      {
+        "type": "definition",
+        "bedrock_identifier": "geyser_custom:piano_up_right_piano_close",
+        "display_name": "Up Right Piano Close",
+        "bedrock_options": {
+          "icon": "kcraft_piano_up_right_piano_close_icon",
+          "display_handheld": false,
+          "allow_offhand": true
+        },
+        "model": "kcraft:piano/up_right_piano_close"
+      }
+    ]
+  }
+}

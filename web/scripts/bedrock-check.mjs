@@ -1,0 +1,34 @@
+// Own private Velocity/Geyser + offline Folia only. Never disable Xbox validation on production.
+import {createRequire} from 'node:module';
+const require=createRequire(new URL('../../.local/bedrock-client/package.json',import.meta.url));const {createClient}=require('bedrock-protocol');
+import WebSocket from 'ws';
+import {readFile,writeFile} from 'node:fs/promises';
+import net from 'node:net';
+import assert from 'node:assert/strict';
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+async function rcon(command){const password=(await readFile(new URL('../../.local/test-rcon.txt',import.meta.url),'utf8')).trim();return new Promise((resolve,reject)=>{const s=net.connect(35690,'127.0.0.1');let buffer=Buffer.alloc(0),authed=false;function send(id,type,text){const t=Buffer.from(text),b=Buffer.alloc(t.length+14);b.writeInt32LE(t.length+10,0);b.writeInt32LE(id,4);b.writeInt32LE(type,8);t.copy(b,12);s.write(b);}s.on('connect',()=>send(1,3,password));s.on('error',reject);s.on('data',data=>{buffer=Buffer.concat([buffer,data]);while(buffer.length>=4&&buffer.length>=buffer.readInt32LE(0)+4){const n=buffer.readInt32LE(0),p=buffer.subarray(4,n+4);buffer=buffer.subarray(n+4);if(!authed&&p.readInt32LE(0)===1){authed=true;send(2,2,command);}else if(p.readInt32LE(0)===2){s.end();resolve(p.subarray(8,-2).toString());}}});s.setTimeout(8000,()=>{s.destroy();reject(Error('RCON timeout'));});});}
+const client=createClient({host:'127.0.0.1',port:19139,username:'PianoBedrock',offline:true,version:'1.26.51',raknetBackend:'raknet-native',skipPing:true,followPort:false});
+let offered=[],displays=0,equipped=0,spawned=false;const sounds=[],stops=[],packets=new Map(),customIds=new Map(),equippedModels=new Set();
+client.on('packet',p=>{const name=p.data?.name;packets.set(name,(packets.get(name)||0)+1);});
+client.on('respawn',p=>{if(p.state===1)client.queue('respawn',{position:p.position,state:2,runtime_entity_id:client.entityId});});
+let position={x:15.9,y:-58.38,z:12},tick=0n;
+client.on('start_game',p=>{position=p.player_position;});client.on('move_player',p=>{position=p.position;});
+const movement=setInterval(()=>{if(!spawned)return;client.queue('player_auth_input',{pitch:0,yaw:0,position,move_vector:{x:0,z:0},head_yaw:0,input_data:['received_server_data','handled_teleport'],input_mode:'mouse',play_mode:'normal',interaction_model:'crosshair',interact_rotation:{x:0,z:0},tick:++tick,delta:{x:0,y:0,z:0},transaction_presence:false,transaction:undefined,item_stack_request_presence:false,item_stack_request:undefined,block_action_presence:false,block_action:undefined,vehicle_rotation_presence:false,vehicle_rotation:undefined,predicted_vehicle_presence:false,predicted_vehicle:undefined,analogue_move_vector:{x:0,z:0},camera_orientation:{x:0,y:0,z:1},raw_move_vector:{x:0,z:0}});},50);
+client.on('join',()=>{client.removeAllListeners('resource_packs_info');client.on('resource_packs_info',p=>{offered=p.texture_packs;console.log('Bedrock packs offered',offered.length);client.write('resource_pack_client_response',{response_status:'have_all_packs',response_status_name:'allpacksdownloaded',resourcepackids:[]});client.queue('client_cache_status',{enabled:false});});client.on('resource_pack_stack',()=>{client.write('resource_pack_client_response',{response_status:'completed',response_status_name:'resourcepackstackfinished',resourcepackids:[]});client.queue('request_chunk_radius',{chunk_radius:3});});});
+client.on('spawn',()=>{spawned=true;client.queue('player_action',{runtime_entity_id:client.entityId,action:'dimension_change_ack',position:{x:0,y:0,z:0},result_position:{x:0,y:0,z:0},face:0});client.queue('serverbound_loading_screen',{type:2,loading_screen_id:undefined});console.log('Bedrock spawned');});
+client.on('add_entity',p=>{if(p.identifier==='geyser:item_display'||p.entity_type==='geyser:item_display')displays++;});
+client.on('item_registry',p=>{for(const item of p.itemstates||[])if(item.name.startsWith('geyser_custom:'))customIds.set(item.runtime_id,item.name);});
+client.on('mob_armor_equipment',p=>{equipped++;const item=p.chestplate;if(item&&customIds.has(item.network_id))equippedModels.add(customIds.get(item.network_id));});
+client.on('play_sound',p=>{sounds.push(p.name);});client.on('stop_sound',p=>stops.push(p.name));
+client.on('disconnect',p=>console.log('Disconnect',p.message));client.on('error',e=>console.log('Client error',e.message));
+for(let i=0;i<120&&!spawned;i++)await wait(500);assert.ok(spawned,'Bedrock must join through the private proxy');
+await rcon('tp PianoBedrock 15.9 -60 12');await wait(1000);await rcon('plugman reload KCraftPiano');await wait(2000);
+const base='https://kcraft-piano.kaisuta-works.workers.dev',password=(await readFile(new URL('../../.local/fixed-password.txt',import.meta.url),'utf8')).trim();
+const login=await fetch(base+'/api/login',{method:'POST',headers:{Origin:base,'Content-Type':'application/json'},body:JSON.stringify({password})});assert.equal(login.status,200);const cookie=login.headers.get('set-cookie').split(';')[0];const list=await(await fetch(base+'/api/pianos',{headers:{Cookie:cookie}})).json();const piano=list.find(p=>p.name==='corner');assert.ok(piano);
+const ws=new WebSocket(base.replace('https','wss')+'/play/'+piano.id,{origin:base,headers:{Cookie:cookie}});await new Promise((r,j)=>{ws.once('open',r);ws.once('error',j);});
+let seq=0;function send(type,n=0,v=0){const b=Buffer.alloc(16);b[0]=type;b[1]=n;b[2]=v;b.writeUInt32LE(++seq,4);b.writeDoubleLE(performance.now(),8);ws.send(b);}
+for(const n of [60,61,64,67,72]){send(0,n,100);await wait(80);send(0,n,0);}await wait(2500);send(2);ws.close();
+const notes=sounds.filter(n=>n.startsWith('kcraft:p')),offs=stops.filter(n=>n.startsWith('kcraft:p'));
+console.log(JSON.stringify({displays,equipped,equippedModels:[...equippedModels],notes,offs,offered:offered.map(p=>({uuid:p.uuid,version:p.version}))}));
+assert.ok(displays>=90,'Bedrock must receive the piano body, bench and 88 keys');assert.ok(equipped>=90,'Custom item display equipment must be sent');assert.equal(notes.length,5);assert.equal(offs.length,5);assert.ok(equippedModels.has('geyser_custom:piano_grand_piano'),'Piano body must use a custom Bedrock model');assert.ok(equippedModels.has('geyser_custom:bench'),'Bench must use a custom Bedrock model');assert.ok(equippedModels.has('geyser_custom:key_piano_key'),'White key model must be equipped');assert.ok(equippedModels.has('geyser_custom:key_piano_black_key'),'Black key model must be equipped');
+const result={bedrockVersion:'1.26.51',privateProxySameGeyserBuild:true,packOfferCount:offered.length,pianoDisplays:displays,displayEquipment:equipped,customModelsEquipped:[...equippedModels],noteOns:notes.length,noteOffs:offs.length,renderedOnPhysicalDevice:false};await writeFile(new URL('../../docs/validation-bedrock-2.3.0.json',import.meta.url),JSON.stringify(result,null,2));clearInterval(movement);client.close();console.log('BEDROCK CHECK PASS');

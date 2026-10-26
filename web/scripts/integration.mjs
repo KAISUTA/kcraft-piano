@@ -15,9 +15,13 @@ async function rcon(command){
 // can read the tested chat/model/sound packets; handshake uses the actual 776 protocol.
 const options={host:'127.0.0.1',port:35689,username:'PianoTest',auth:'offline',version:'26.1',connect(c){options.protocolVersion=776;c.setSocket(net.connect(35689,'127.0.0.1'));}};
 const client=mc.createClient(options);
-const packets=new Map();let token,position;let performerNotes=0,performerStops=0;
+const packets=new Map();let token,position;let performerNotes=0,performerStops=0;let riderId;const rising=new Set(),gone=new Set();let seated=false;
 client.on('packet',(data,meta)=>{
   packets.set(meta.name,(packets.get(meta.name)||0)+1);
+  if(meta.name==='login')riderId=data.entityId;
+  if(meta.name==='set_passengers'&&data.passengers?.includes(riderId))seated=true;
+  if(meta.name==='entity_metadata'&&data.metadata?.some(m=>m.key===11&&m.value?.y>2))rising.add(data.entityId);
+  if(meta.name==='entity_destroy')for(const id of data.entityIds)gone.add(id);
   if(JSON.stringify(data)?.includes('kcraft:p')){if(meta.name==='sound_effect')performerNotes++;if(meta.name==='stop_sound')performerStops++;}
   if(meta.name==='position'){position=data;if(data.teleportId!==undefined)client.write('teleport_confirm',{teleportId:data.teleportId});}
   if(meta.name==='update_health'&&data.health<=0)client.write('client_command',{actionId:0});
@@ -66,6 +70,7 @@ await wait(1500);const before=acks;
 for(let i=0;i<250;i++){send(0,21+i%88,100);send(0,21+i%88,0);}
 for(let i=0;i<100&&acks<before+500;i++)await wait(50);
 assert.equal(acks-before,500,'500-message burst must not lose note on/off or acknowledgement packets');result.burstAcknowledged=500;
+if(process.env.PIANO_FEATURES230==='1'){await wait(2500);assert.ok(rising.size>0,'Played keys must rise at least two blocks');assert.ok([...rising].every(id=>gone.has(id)),'All floating notes must be removed');client.chat('/piano sit '+pianoName);await wait(2000);assert.ok(seated,'GSit must seat the test player');result.risingKeys=rising.size;result.risingKeysCleaned=[...rising].filter(id=>gone.has(id)).length;result.benchSeated=seated;}
 console.log(JSON.stringify(result,null,2));await mkdir('test-output',{recursive:true});await writeFile('test-output/integration.json',JSON.stringify(result,null,2));
 // Keep the Minecraft owner online while a browser verifies the same session.
 socket.close();await wait(700);
