@@ -1,0 +1,38 @@
+{
+  "trails": 6,
+  "holdDurationsMs": [
+    100,
+    800,
+    200,
+    100,
+    400,
+    200
+  ],
+  "panicReleasesHeldTrail": true,
+  "peakLengths": [
+    0.22443635761737823,
+    1.539793610572815,
+    0.4133279025554657,
+    0.23033683001995087,
+    0.7909908294677734,
+    0.42968401312828064
+  ],
+  "pedalIndependent": true,
+  "allRemoved": true,
+  "flightOrientationFixed": true,
+  "bedrockVersion": "1.26.51",
+  "privateProxySameGeyserBuild": true,
+  "packOfferCount": 2,
+  "pianoDisplays": 366,
+  "displayEquipment": 564,
+  "customModelsEquipped": [
+    "geyser_custom:key_piano_key",
+    "geyser_custom:key_piano_black_key",
+    "geyser_custom:piano_grand_piano",
+    "geyser_custom:bench",
+    "geyser_custom:key_piano_key_down"
+  ],
+  "noteOns": 6,
+  "noteOffs": 6,
+  "renderedOnPhysicalDevice": false
+}

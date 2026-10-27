@@ -16,6 +16,7 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
       - run: mvn -B -f folia/pom.xml clean package
+      - run: java -ea -cp folia/target/classes:folia/target/test-classes jp.kcraft.piano.NoteTrailCheck
       - run: python scripts/build_pack.py
       - run: python scripts/check_model_alignment.py
       - run: npm ci && npm run build && npm test

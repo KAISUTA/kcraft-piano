@@ -25,6 +25,7 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.concurrent.atomic.AtomicIntegerArray;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -226,7 +227,8 @@ public final class PianoPlugin extends JavaPlugin implements Listener, CommandEx
         final boolean[] pressed=new boolean[88];
         final AtomicReference<Session> active=new AtomicReference<>();
         final AtomicIntegerArray nextAnimation=new AtomicIntegerArray(88);
-        final ArrayBlockingQueue<Integer> nextFlights=new ArrayBlockingQueue<>(128);
+        final ArrayBlockingQueue<NoteTrail> nextFlights=new ArrayBlockingQueue<>(128);
+        final AtomicReferenceArray<NoteTrail> heldTrails=new AtomicReferenceArray<>(88);
         final AtomicBoolean animationScheduled=new AtomicBoolean();
         volatile ItemDisplay body; final List<ItemDisplay> models=new CopyOnWriteArrayList<>();
         final Set<Long> chunks=ConcurrentHashMap.newKeySet();
@@ -270,23 +272,37 @@ public final class PianoPlugin extends JavaPlugin implements Listener, CommandEx
             double a=Math.toRadians(origin.getYaw()),c=Math.cos(a),v=Math.sin(a),x=eye.getX()-origin.getX(),z=eye.getZ()-origin.getZ();
             return geometry.ray(c*x+v*z,eye.getY()-origin.getY(),-v*x+c*z,c*direction.getX()+v*direction.getZ(),direction.getY(),-v*direction.getX()+c*direction.getZ(),6);
         }
-        void note(int note,int velocity,UUID performer){if(removed||note<21||note>108)return;animate(note,velocity);if(velocity>0)fly(note-21);if(realtime!=null)realtime.handle(voice,0,note,velocity,volume,performer);else soundFallback(note,velocity,performer);}
+        void note(int note,int velocity,UUID performer){if(removed||note<21||note>108)return;animate(note,velocity);NoteTrail trail=trail(note-21,velocity);if(trail!=null)fly(trail);if(realtime!=null)realtime.handle(voice,0,note,velocity,volume,performer);else soundFallback(note,velocity,performer);}
         void animate(int note,int velocity){
             if(removed)return;int i=note-21;pressed[i]=velocity>0;
             ItemDisplay key=keys[i];if(key==null)return;boolean black=geometry.black[i];
             ItemStack stack=item(black?(velocity>0?167076:167075):(velocity>0?167078:167077),velocity>0?Color.fromRGB(76,151,220):black?Color.fromRGB(22,22,22):Color.WHITE);
             entity(key,()->key.setItemStack(stack));
         }
-        void fly(int i){
+        NoteTrail trail(int i,int velocity){
+            long now=System.nanoTime();NoteTrail next=velocity>0?new NoteTrail(i,now):null;
+            NoteTrail previous=heldTrails.getAndSet(i,next);if(previous!=null)previous.release(now);
+            return next;
+        }
+        void fly(NoteTrail trail){
+            int i=trail.key;
             if(flyingCount.incrementAndGet()>128){flyingCount.decrementAndGet();return;}
-            model(position(geometry.x[i],geometry.floor(i)+.07,geometry.centerZ(i)),geometry.black[i]?167075:167077,Color.fromRGB(76,151,220),new Vector3f(0,.1f,0),new Vector3f((float)(4*KeyboardGeometry.WHITE_WIDTH),.2f,(float)geometry.depthScale(i))).whenComplete((display,error)->{
+            float width=(float)(4*KeyboardGeometry.WHITE_WIDTH*(geometry.black[i]?.5:1));
+            model(position(geometry.x[i],geometry.floor(i)+.07,geometry.centerZ(i)),167078,Color.fromRGB(76,151,220),new Vector3f(0,.08f,0),new Vector3f(width,.16f,(float)geometry.depthScale(i))).whenComplete((display,error)->{
                 if(display==null){flyingCount.decrementAndGet();return;}
-                flying.add(display);Location start=display.getLocation().clone();display.setTeleportDuration(2);int[] step={0};display.getScheduler().runAtFixedRate(PianoPlugin.this,task->{
-                    if(!display.isValid()){task.cancel();return;}
-                    display.teleportAsync(start.clone().add(0,3d*(++step[0]/16d),0));
-                    if(step[0]>=16)task.cancel();
-                },null,2,2);
-                display.getScheduler().execute(PianoPlugin.this,()->{display.remove();models.remove(display);flying.remove(display);flyingCount.decrementAndGet();},()->{models.remove(display);flying.remove(display);flyingCount.decrementAndGet();},36);
+                flying.add(display);Location start=display.getLocation().clone();display.setTeleportDuration(2);
+                AtomicBoolean cleaned=new AtomicBoolean();Runnable cleanup=()->{if(cleaned.compareAndSet(false,true)){models.remove(display);flying.remove(display);flyingCount.decrementAndGet();}};
+                display.getScheduler().runAtFixedRate(PianoPlugin.this,task->{
+                    NoteTrail.Frame frame=trail.frame(System.nanoTime());
+                    if(removed||!display.isValid()||frame.finished()){task.cancel();display.remove();cleanup.run();return;}
+                    // The reused white-key mesh spans Y=0..4 around the item origin Y=8.
+                    // Offset by half its scale so the strip's bottom stays on the key.
+                    Transformation pose=display.getTransformation();
+                    pose.getScale().y=(float)(4*frame.length());
+                    pose.getTranslation().y=(float)(2*frame.length());
+                    display.setInterpolationDelay(0);display.setInterpolationDuration(2);display.setTransformation(pose);
+                    if(frame.bottom()>0)display.teleportAsync(start.clone().add(0,frame.bottom(),0));
+                },cleanup,1,2);
             });
         }
         boolean benchHit(Location eye,org.bukkit.util.Vector direction){
@@ -310,7 +326,7 @@ public final class PianoPlugin extends JavaPlugin implements Listener, CommandEx
                 }catch(ReflectiveOperationException error){getLogger().warning("Seat failed: "+error);player.sendMessage("着席できませんでした。");}
             });});
         }
-        void queueAnimation(int note,int velocity){if(velocity>0)nextFlights.offer(note-21);nextAnimation.set(note-21,velocity);if(animationScheduled.compareAndSet(false,true))at(this,()->{animationScheduled.set(false);for(int i=0;i<88;i++){int v=nextAnimation.getAndSet(i,-1);if(v>=0)animate(i+21,v);}for(int n=0;n<128;n++){Integer i=nextFlights.poll();if(i==null)break;fly(i);}});}
+        void queueAnimation(int note,int velocity){NoteTrail trail=trail(note-21,velocity);if(trail!=null)nextFlights.offer(trail);nextAnimation.set(note-21,velocity);if(animationScheduled.compareAndSet(false,true))at(this,()->{animationScheduled.set(false);for(int i=0;i<88;i++){int v=nextAnimation.getAndSet(i,-1);if(v>=0)animate(i+21,v);}for(int n=0;n<128;n++){NoteTrail next=nextFlights.poll();if(next==null)break;fly(next);}});}
         void soundFallback(int note,int velocity,UUID performer){
             // Send each recipient's sound on that recipient's entity owner thread.
             // No global-region task and no unbounded note queue.
@@ -330,7 +346,7 @@ public final class PianoPlugin extends JavaPlugin implements Listener, CommandEx
             sustain=false; for (int i=0;i<88;i++) if (pressed[i]) note(i+21,0,null);
             for (Player listener:players.values()) onPlayer(listener,()-> { if (listener.getWorld().equals(origin.getWorld()) && listener.getLocation().distanceSquared(origin)<=range*range) for(int n=21;n<=108;n++){listener.stopSound("minecraft:1."+n,SoundCategory.RECORDS);listener.stopSound("minecraft:1c."+n,SoundCategory.RECORDS);} });
         }
-        void resetKeys(){for(int i=0;i<88;i++){nextAnimation.set(i,-1);if(pressed[i])animate(i+21,0);}}
+        void resetKeys(){for(int i=0;i<88;i++){trail(i,0);nextAnimation.set(i,-1);if(pressed[i])animate(i+21,0);}}
         void pedal(boolean down) { if(realtime!=null){realtime.handle(voice,1,0,down?127:0,volume,null);return;}boolean previous=sustain; sustain=down; if(previous&&!down){boolean[] held=pressed.clone();for(Player listener:players.values()) onPlayer(listener,()->{if(listener.getWorld().equals(origin.getWorld())&&listener.getLocation().distanceSquared(origin)<=range*range)for(int n=21;n<=108;n++)if(!held[n-21])listener.stopSound("minecraft:1c."+n,SoundCategory.RECORDS);});} }
         void destroy(){
             if(removed)return;panic();removed=true;ready=false;
