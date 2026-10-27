@@ -164,7 +164,7 @@ public class ItemDisplayEntity extends SlotDisplayEntity {
         if (components != null) modelData = components.get(DataComponentTypes.CUSTOM_MODEL_DATA);
         if (mappingConfig.getInt("model-data") == -1) return entityApplyDisplayConfig(mappingConfig);
         if (modelData == null) return false;
-        
+
         if (Math.abs(mappingConfig.getInt("model-data") - modelData.floats().get(0)) < 0.5) return entityApplyDisplayConfig(mappingConfig);
 
         return false;
