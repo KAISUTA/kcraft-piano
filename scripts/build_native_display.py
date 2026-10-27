@@ -24,12 +24,12 @@ classes = root / '.local/native-display-classes'
 classes.mkdir(parents=True, exist_ok=True)
 deps = [base, root / '.local/Geyser-live.jar', annotation, root / '.local/bedrock-proxy/velocity.jar']
 subprocess.run([compiler, '--release', '21', '-cp', os.pathsep.join(map(str, deps)), '-d', str(classes), str(root / 'bedrock/extension-src/ItemDisplayEntity.java')], check=True)
-target = root / 'web/public/downloads/GeyserDisplayEntity-1.0.14-kcraft-native1.jar'
+target = root / 'web/public/downloads/GeyserDisplayEntity-1.0.14-kcraft-native2.jar'
 patched_class = 'me/geyserextensionists/geyserdisplayentity/entity/ItemDisplayEntity.class'
 with zipfile.ZipFile(base) as original, zipfile.ZipFile(target, 'w', zipfile.ZIP_DEFLATED) as output:
     for name in original.namelist():
         data = (classes / name).read_bytes() if name == patched_class else original.read(name)
         if name == 'extension.yml':
-            data = data.replace(b'1.0.14', b'1.0.14-kcraft-native1')
+            data = data.replace(b'1.0.14', b'1.0.14-kcraft-native2')
         output.writestr(name, data)
 print(target.name, hashlib.sha256(target.read_bytes()).hexdigest())

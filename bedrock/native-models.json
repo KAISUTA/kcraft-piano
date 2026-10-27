@@ -3,7 +3,7 @@
   "version": [
     2,
     5,
-    0
+    1
   ],
   "models": [
     "bench",
@@ -14,6 +14,8 @@
     "piano_electric_piano",
     "piano_grand_piano",
     "piano_grand_piano_close",
-    "piano_up_right_piano_close"
+    "piano_up_right_piano_close",
+    "note_bar_pink",
+    "note_bar_cyan"
   ]
 }

@@ -81,6 +81,28 @@
       },
       {
         "type": "definition",
+        "bedrock_identifier": "geyser_custom:note_bar_cyan",
+        "display_name": "Bar Cyan",
+        "bedrock_options": {
+          "icon": "kcraft_note_bar_cyan_icon",
+          "display_handheld": false,
+          "allow_offhand": true
+        },
+        "model": "kcraft:note/bar_cyan"
+      },
+      {
+        "type": "definition",
+        "bedrock_identifier": "geyser_custom:note_bar_pink",
+        "display_name": "Bar Pink",
+        "bedrock_options": {
+          "icon": "kcraft_note_bar_pink_icon",
+          "display_handheld": false,
+          "allow_offhand": true
+        },
+        "model": "kcraft:note/bar_pink"
+      },
+      {
+        "type": "definition",
         "bedrock_identifier": "geyser_custom:pianist_pianist_body",
         "display_name": "Pianist Body",
         "bedrock_options": {

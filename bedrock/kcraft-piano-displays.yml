@@ -30,6 +30,16 @@ mappings:
     item-identifier: "key_piano_key_down"
     displayentityoptions:
       y-offset: -0.5
+  note_bar_cyan:
+    type: "minecraft:leather_horse_armor"
+    item-identifier: "note_bar_cyan"
+    displayentityoptions:
+      y-offset: -0.5
+  note_bar_pink:
+    type: "minecraft:leather_horse_armor"
+    item-identifier: "note_bar_pink"
+    displayentityoptions:
+      y-offset: -0.5
   piano_electric_piano:
     type: "minecraft:leather_horse_armor"
     item-identifier: "piano_electric_piano"

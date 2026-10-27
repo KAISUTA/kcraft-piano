@@ -1,0 +1,70 @@
+{
+  "timestamp": "2026-10-27T07:47:40.689Z",
+  "minecraft": "Folia 26.2",
+  "acks": 101,
+  "roundTripMs": {
+    "count": 101,
+    "min": 18.435300000001007,
+    "p50": 23.19999999999891,
+    "p95": 28.712099999998827,
+    "max": 31.5658999999996
+  },
+  "serverDispatchMs": {
+    "count": 101,
+    "min": 0.001182,
+    "p50": 0.028518,
+    "p95": 0.130416,
+    "max": 3.109292
+  },
+  "packets": {
+    "entity_status": 3,
+    "entity_metadata": 1213,
+    "entity_update_attributes": 302,
+    "spawn_entity": 388,
+    "sync_entity_position": 1099,
+    "sound_effect": 137,
+    "entity_velocity": 2147,
+    "rel_entity_move": 2979,
+    "entity_head_rotation": 364,
+    "entity_look": 80,
+    "entity_equipment": 18,
+    "entity_move_look": 127,
+    "entity_destroy": 22,
+    "stop_sound": 40
+  },
+  "observerSoundPackets": 143,
+  "observerSoundPacketNames": [
+    "sound_effect",
+    "stop_sound"
+  ],
+  "customPianoNoteOns": 40,
+  "customPianoStops": 40,
+  "performerNoteOns": 40,
+  "performerStops": 40,
+  "shortNoteRisingKeys": 5,
+  "burstAcknowledged": 500,
+  "risingKeys": 173,
+  "risingKeysCleaned": 173,
+  "benchSeated": true,
+  "productionPlugin": "2.4.2",
+  "javaPackVersion": "2.4.2",
+  "bedrockPackVersion": "2.5.1",
+  "barModels": {
+    "white": {
+      "model": 167088,
+      "color": "#f257a4",
+      "width": 0.035
+    },
+    "black": {
+      "model": 167089,
+      "color": "#32d5e1",
+      "width": 0.024
+    },
+    "depth": 0.026,
+    "unitCube": true
+  },
+  "workerVersion": "cb253d63-3230-4eb5-a708-cd734f19f2b3",
+  "backendRestarted": false,
+  "proxyStartedAt": "2026-10-27T07:53:48.30900635Z",
+  "physicalRenderingVerified": false
+}

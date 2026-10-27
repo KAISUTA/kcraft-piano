@@ -7,14 +7,14 @@ import zipfile
 from PIL import Image
 
 root = pathlib.Path(__file__).resolve().parents[1]
-pack = root / 'web/public/downloads/kcraft-piano-bedrock-2.5.0.mcpack'
+pack = root / 'web/public/downloads/kcraft-piano-bedrock-2.5.1.mcpack'
 mapping = json.loads((root / 'bedrock/kcraft-piano-items.json').read_text(encoding='utf-8'))
 models = mapping['items']['minecraft:leather_horse_armor']
 with zipfile.ZipFile(pack) as z:
     names = set(z.namelist())
     assert len(names) == len(z.namelist()), 'Duplicate ZIP entries'
     manifest = json.loads(z.read('manifest.json'))
-    assert manifest['header']['version'] == [2, 5, 0]
+    assert manifest['header']['version'] == [2, 5, 1]
     assert all(0 <= n < 100 for n in manifest['header']['version'])
     actor = json.loads(z.read('entity/item_display.entity.json'))['minecraft:client_entity']['description']
     assert actor['scripts']['animate'] == ['kcraft_stable']
@@ -22,7 +22,7 @@ with zipfile.ZipFile(pack) as z:
     assert all('* 1.6' in expr for expr in animation['geyser']['position'])
     assert actor['render_controllers'] == ['controller.render.kcraft.native_piano']
     controller=json.loads(z.read('render_controllers/kcraft_native.render_controllers.json'))['render_controllers']['controller.render.kcraft.native_piano']
-    assert len(controller['arrays']['geometries']['Array.kcraft_models']) == 10
+    assert len(controller['arrays']['geometries']['Array.kcraft_models']) == 12
     assert animation['geyser']['position'][0].startswith('-')
     geometries = {}
     for name in names:
@@ -62,6 +62,14 @@ with zipfile.ZipFile(pack) as z:
         for model in models:
             name = model['model'].split(':')[1]
             source = json.loads(java.read('assets/kcraft/models/' + name + '.json'))
+            if name.startswith('note/bar_'):
+                assert len(source['elements']) == 1
+                cube = source['elements'][0]
+                assert cube['from'] == [0, 0, 0] and cube['to'] == [16, 16, 16], 'Bars must use a plain unit cube, never a keyboard mesh'
+                color = (242, 87, 164) if name.endswith('pink') else (50, 213, 225)
+                texture = source['textures']['bar'].split(':')[-1]
+                image = Image.open(io.BytesIO(java.read('assets/minecraft/textures/' + texture + '.png'))).convert('RGB')
+                assert image.getextrema() == tuple((c, c) for c in color), 'Bars must have solid pink/cyan textures'
             attachable = json.loads(z.read('attachables/' + model['bedrock_identifier'].replace(':', '/') + '.json'))['minecraft:attachable']['description']
             geometry = geometries[attachable['geometry']['default']]
             cubes = [cube for bone in geometry['bones'] for cube in bone.get('cubes', [])]
@@ -90,5 +98,5 @@ with zipfile.ZipFile(pack) as z:
     black = Image.open(io.BytesIO(z.read('textures/kcraft/piano/key_piano_black_key.png'))).convert('RGB')
     assert max(v[1] for v in black.getextrema()) <= 22, 'Black keys must not use an untinted white atlas'
     assert 'JW-Piano-license.txt' in names
-print(json.dumps({'models': len(models), 'soundMappings': checked, 'nativeEntityMeshes': 9,
-                  'blackKeyColorBaked': True, 'allReferencesExist': True, 'packVersion': [2, 5, 0], 'opaqueFacesChecked': face_count, 'grandPianoFeetY': floor, 'stablePoseOnly': True}))
+print(json.dumps({'models': len(models), 'soundMappings': checked, 'nativeEntityMeshes': 11,
+                  'blackKeyColorBaked': True, 'allReferencesExist': True, 'packVersion': [2, 5, 1], 'opaqueFacesChecked': face_count, 'grandPianoFeetY': floor, 'stablePoseOnly': True}))

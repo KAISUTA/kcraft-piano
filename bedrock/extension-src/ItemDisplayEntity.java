@@ -35,7 +35,7 @@ public class ItemDisplayEntity extends SlotDisplayEntity {
     private boolean custom = false;
     private boolean needHide = false;
     private int nativePiano;
-    private static final List<String> NATIVE_PIANO_MODELS = List.of("bench","key_piano_black_key","key_piano_black_key_down","key_piano_key","key_piano_key_down","piano_electric_piano","piano_grand_piano","piano_grand_piano_close","piano_up_right_piano_close");
+    private static final List<String> NATIVE_PIANO_MODELS = List.of("bench","key_piano_black_key","key_piano_black_key_down","key_piano_key","key_piano_key_down","piano_electric_piano","piano_grand_piano","piano_grand_piano_close","piano_up_right_piano_close","note_bar_pink","note_bar_cyan");
 
     public ItemDisplayEntity(EntitySpawnContext entitySpawnContext) {
         super(entitySpawnContext);

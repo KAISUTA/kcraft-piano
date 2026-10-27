@@ -222,6 +222,7 @@ public final class PianoPlugin extends JavaPlugin implements Listener, CommandEx
     private ItemStack item(int model, Color color) {
         ItemStack item = new ItemStack(Material.LEATHER_HORSE_ARMOR); var meta=(LeatherArmorMeta)item.getItemMeta(); meta.setCustomModelData(model); meta.setColor(color);
         String path=Map.of(167072,"bench",167075,"key/piano_black_key",167076,"key/piano_black_key_down",167077,"key/piano_key",167078,"key/piano_key_down",167084,"piano/electric_piano",167085,"piano/grand_piano",167086,"piano/grand_piano_close",167087,"piano/up_right_piano_close").get(model);
+        if(model==167088)path="note/bar_pink";else if(model==167089)path="note/bar_cyan";
         if(path!=null)meta.setItemModel(new NamespacedKey("kcraft",path));item.setItemMeta(meta);return item;
     }
     private final class Piano {
@@ -291,19 +292,20 @@ public final class PianoPlugin extends JavaPlugin implements Listener, CommandEx
         void fly(NoteTrail trail){
             int i=trail.key;
             if(flyingCount.incrementAndGet()>128){flyingCount.decrementAndGet();return;}
-            float width=(float)(4*KeyboardGeometry.WHITE_WIDTH*(geometry.black[i]?.5:1));
-            model(position(geometry.x[i],geometry.floor(i)+.07,geometry.centerZ(i)),167078,Color.fromRGB(76,151,220),new Vector3f(0,.08f,0),new Vector3f(width,.16f,(float)geometry.depthScale(i))).whenComplete((display,error)->{
+            float width=geometry.black[i]?.024f:.035f;
+            model(position(geometry.x[i],geometry.floor(i)+.07,geometry.centerZ(i)),geometry.black[i]?167089:167088,Color.WHITE,new Vector3f(0,.02f,0),new Vector3f(width,.04f,.026f)).whenComplete((display,error)->{
                 if(display==null){flyingCount.decrementAndGet();return;}
+                display.setBrightness(new Display.Brightness(15,15));
                 flying.add(display);Location start=display.getLocation().clone();display.setTeleportDuration(2);
                 AtomicBoolean cleaned=new AtomicBoolean();Runnable cleanup=()->{if(cleaned.compareAndSet(false,true)){models.remove(display);flying.remove(display);flyingCount.decrementAndGet();}};
                 display.getScheduler().runAtFixedRate(PianoPlugin.this,task->{
                     NoteTrail.Frame frame=trail.frame(System.nanoTime());
                     if(removed||!display.isValid()||frame.finished()){task.cancel();display.remove();cleanup.run();return;}
-                    // The reused white-key mesh spans Y=0..4 around the item origin Y=8.
-                    // Offset by half its scale so the strip's bottom stays on the key.
+                    // A plain unit cube becomes a thin vertical light bar.
+                    // Its centre moves by half the length so its bottom stays on the key.
                     Transformation pose=display.getTransformation();
-                    pose.getScale().y=(float)(4*frame.length());
-                    pose.getTranslation().y=(float)(2*frame.length());
+                    pose.getScale().y=(float)frame.length();
+                    pose.getTranslation().y=(float)(frame.length()/2);
                     display.setInterpolationDelay(0);display.setInterpolationDuration(2);display.setTransformation(pose);
                     if(frame.bottom()>0)display.teleportAsync(start.clone().add(0,frame.bottom(),0));
                 },cleanup,1,2);

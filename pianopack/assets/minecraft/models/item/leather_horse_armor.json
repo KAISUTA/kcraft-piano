@@ -19,6 +19,8 @@
         { "predicate": {  "custom_model_data": 167084 } , "model": "item/jw/piano/electric_piano" },
         { "predicate": {  "custom_model_data": 167085 } , "model": "item/jw/piano/grand_piano" },
         { "predicate": {  "custom_model_data": 167086 } , "model": "item/jw/piano/grand_piano_close" },
-        { "predicate": {  "custom_model_data": 167087 } , "model": "item/jw/piano/up_right_piano_close" }
+        { "predicate": {  "custom_model_data": 167087 } , "model": "item/jw/piano/up_right_piano_close" },
+        { "predicate": { "custom_model_data": 167088 }, "model": "item/jw/note/bar_pink" },
+        { "predicate": { "custom_model_data": 167089 }, "model": "item/jw/note/bar_cyan" }
     ]
 }

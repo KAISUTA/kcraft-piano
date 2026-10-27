@@ -34,7 +34,7 @@ with zipfile.ZipFile(source) as original, zipfile.ZipFile(modern, 'w', zipfile.Z
 
 paths = ['bench', 'key/piano_black_key', 'key/piano_black_key_down', 'key/piano_key',
          'key/piano_key_down', 'piano/electric_piano', 'piano/grand_piano',
-         'piano/grand_piano_close', 'piano/up_right_piano_close']
+         'piano/grand_piano_close', 'piano/up_right_piano_close', 'note/bar_pink', 'note/bar_cyan']
 core = ENGINE / 'packages/core'
 entry = core / 'kcraft-convert.mjs'
 bundle = core / 'kcraft-convert-bundle.mjs'
@@ -53,7 +53,7 @@ subprocess.run(['node', '--input-type=module', '-e',
                     'packages': 'external', 'outfile': str(bundle)}) + ');'], check=True)
 subprocess.run(['node', str(bundle)], check=True)
 
-target = ROOT / 'web/public/downloads/kcraft-piano-bedrock-2.5.0.mcpack'
+target = ROOT / 'web/public/downloads/kcraft-piano-bedrock-2.5.1.mcpack'
 with zipfile.ZipFile(OUT / 'raw.mcpack') as original, zipfile.ZipFile(target, 'w', zipfile.ZIP_DEFLATED) as z:
     tinted = {}
     for name in original.namelist():
@@ -61,8 +61,8 @@ with zipfile.ZipFile(OUT / 'raw.mcpack') as original, zipfile.ZipFile(target, 'w
         if name == 'manifest.json':
             obj = json.loads(data)
             for item in [obj['header'], *obj['modules']]:
-                item['version'] = [2, 5, 0]
-            obj['header']['name'] = 'K-Craft Piano Native 2.5.0'
+                item['version'] = [2, 5, 1]
+            obj['header']['name'] = 'K-Craft Piano Native 2.5.1'
             obj['header']['uuid'] = str(uuid.uuid5(uuid.NAMESPACE_URL, 'https://kcraft-piano.kaisuta-works.workers.dev/bedrock-pack/native-v1'))
             obj['modules'][0]['uuid'] = str(uuid.uuid5(uuid.NAMESPACE_URL, 'https://kcraft-piano.kaisuta-works.workers.dev/bedrock-resources/native-v1'))
             data = json.dumps(obj).encode()
@@ -134,8 +134,8 @@ with zipfile.ZipFile(OUT / 'raw.mcpack') as original, zipfile.ZipFile(target, 'w
         'controller.render.kcraft.native_piano': {
             'arrays': {'geometries': {'Array.kcraft_models': native_geometry},
                        'textures': {'Array.kcraft_textures': native_texture}},
-            'geometry': 'Array.kcraft_models[math.clamp(q.variant, 0, 9)]',
-            'textures': ['Array.kcraft_textures[math.clamp(q.variant, 0, 9)]'],
+            'geometry': 'Array.kcraft_models[math.clamp(q.variant, 0, 11)]',
+            'textures': ['Array.kcraft_textures[math.clamp(q.variant, 0, 11)]'],
             'materials': [{'*': 'Material.native'}]}}}
     z.writestr('render_controllers/kcraft_native.render_controllers.json', json.dumps(native_controller))
     stable = {'geyser': {

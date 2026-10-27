@@ -2,7 +2,7 @@
 import json, zipfile, pathlib, hashlib
 root=pathlib.Path(__file__).resolve().parents[1]
 out=root/'web/public/downloads';out.mkdir(parents=True,exist_ok=True)
-models={167072:'bench',167073:'flyingnote',167074:'icons/icon',167075:'key/piano_black_key',167076:'key/piano_black_key_down',167077:'key/piano_key',167078:'key/piano_key_down',167081:'pianist/pianist_body',167082:'pianist/pianist_hands',167083:'pianist/pianist_head',167084:'piano/electric_piano',167085:'piano/grand_piano',167086:'piano/grand_piano_close',167087:'piano/up_right_piano_close'}
+models={167072:'bench',167073:'flyingnote',167074:'icons/icon',167075:'key/piano_black_key',167076:'key/piano_black_key_down',167077:'key/piano_key',167078:'key/piano_key_down',167081:'pianist/pianist_body',167082:'pianist/pianist_hands',167083:'pianist/pianist_head',167084:'piano/electric_piano',167085:'piano/grand_piano',167086:'piano/grand_piano_close',167087:'piano/up_right_piano_close',167088:'note/bar_pink',167089:'note/bar_cyan'}
 pack=out/'kcraft-piano-pack.zip'
 with zipfile.ZipFile(pack,'w',zipfile.ZIP_DEFLATED) as z:
     for p in (root/'pianopack').rglob('*'):
