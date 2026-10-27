@@ -1,0 +1,21 @@
+{
+  "flyingKeys": 5,
+  "riseBlocks": 3,
+  "flightOrientationFixed": true,
+  "bedrockVersion": "1.26.51",
+  "privateProxySameGeyserBuild": true,
+  "packOfferCount": 2,
+  "pianoDisplays": 365,
+  "displayEquipment": 560,
+  "customModelsEquipped": [
+    "geyser_custom:bench",
+    "geyser_custom:key_piano_key",
+    "geyser_custom:key_piano_black_key",
+    "geyser_custom:piano_grand_piano",
+    "geyser_custom:key_piano_key_down",
+    "geyser_custom:key_piano_black_key_down"
+  ],
+  "noteOns": 5,
+  "noteOffs": 5,
+  "renderedOnPhysicalDevice": false
+}

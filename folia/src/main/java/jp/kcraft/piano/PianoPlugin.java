@@ -281,10 +281,9 @@ public final class PianoPlugin extends JavaPlugin implements Listener, CommandEx
             if(flyingCount.incrementAndGet()>128){flyingCount.decrementAndGet();return;}
             model(position(geometry.x[i],geometry.floor(i)+.07,geometry.centerZ(i)),geometry.black[i]?167075:167077,Color.fromRGB(76,151,220),new Vector3f(0,.1f,0),new Vector3f((float)(4*KeyboardGeometry.WHITE_WIDTH),.2f,(float)geometry.depthScale(i))).whenComplete((display,error)->{
                 if(display==null){flyingCount.decrementAndGet();return;}
-                flying.add(display);int[] step={0};display.getScheduler().runAtFixedRate(PianoPlugin.this,task->{
+                flying.add(display);Location start=display.getLocation().clone();display.setTeleportDuration(2);int[] step={0};display.getScheduler().runAtFixedRate(PianoPlugin.this,task->{
                     if(!display.isValid()){task.cancel();return;}
-                    display.setInterpolationDelay(0);display.setInterpolationDuration(2);
-                    display.setTransformation(new Transformation(new Vector3f(0,.1f+3f*(++step[0]/16f),0),new Quaternionf(),new Vector3f((float)(4*KeyboardGeometry.WHITE_WIDTH),.2f,(float)geometry.depthScale(i)),new Quaternionf().rotationY((float)Math.PI)));
+                    display.teleportAsync(start.clone().add(0,3d*(++step[0]/16d),0));
                     if(step[0]>=16)task.cancel();
                 },null,2,2);
                 display.getScheduler().execute(PianoPlugin.this,()->{display.remove();models.remove(display);flying.remove(display);flyingCount.decrementAndGet();},()->{models.remove(display);flying.remove(display);flyingCount.decrementAndGet();},36);

@@ -15,11 +15,15 @@ async function rcon(command){
 // can read the tested chat/model/sound packets; handshake uses the actual 776 protocol.
 const options={host:'127.0.0.1',port:35689,username:'PianoTest',auth:'offline',version:'26.1',connect(c){options.protocolVersion=776;c.setSocket(net.connect(35689,'127.0.0.1'));}};
 const client=mc.createClient(options);
-const packets=new Map();let token,position;let performerNotes=0,performerStops=0;let riderId;const rising=new Set(),gone=new Set();let seated=false;
+const packets=new Map();let token,position;let performerNotes=0,performerStops=0;let riderId;const rising=new Set(),gone=new Set(),spawnPositions=new Map(),riseDistances=new Map(),displayIds=new Set();let seated=false;
 client.on('packet',(data,meta)=>{
   packets.set(meta.name,(packets.get(meta.name)||0)+1);
   if(meta.name==='login')riderId=data.entityId;
   if(meta.name==='set_passengers'&&data.passengers?.includes(riderId))seated=true;
+  if(meta.name==='entity_metadata'&&[11,12].every(k=>data.metadata?.some(m=>m.key===k&&typeof m.value?.y==='number')))displayIds.add(data.entityId);
+  if(meta.name==='spawn_entity')spawnPositions.set(data.entityId,{x:data.x,y:data.y,z:data.z});
+  if(['sync_entity_position','entity_teleport'].includes(meta.name)&&displayIds.has(data.entityId)&&spawnPositions.has(data.entityId)){const dy=data.y-spawnPositions.get(data.entityId).y;riseDistances.set(data.entityId,dy);if(dy>2)rising.add(data.entityId);}
+  if(['rel_entity_move','entity_move_look'].includes(meta.name)&&displayIds.has(data.entityId)&&spawnPositions.has(data.entityId)){const dy=(riseDistances.get(data.entityId)||0)+data.dY/4096;riseDistances.set(data.entityId,dy);if(dy>2)rising.add(data.entityId);}
   if(meta.name==='entity_metadata'&&data.metadata?.some(m=>m.key===11&&m.value?.y>2))rising.add(data.entityId);
   if(meta.name==='entity_destroy')for(const id of data.entityIds)gone.add(id);
   if(JSON.stringify(data)?.includes('kcraft:p')){if(meta.name==='sound_effect')performerNotes++;if(meta.name==='stop_sound')performerStops++;}

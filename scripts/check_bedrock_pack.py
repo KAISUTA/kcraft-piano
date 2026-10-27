@@ -6,15 +6,19 @@ import zipfile
 from PIL import Image
 
 root = pathlib.Path(__file__).resolve().parents[1]
-pack = root / 'web/public/downloads/kcraft-piano-bedrock-2.3.1.mcpack'
+pack = root / 'web/public/downloads/kcraft-piano-bedrock-2.3.2.mcpack'
 mapping = json.loads((root / 'bedrock/kcraft-piano-items.json').read_text(encoding='utf-8'))
 models = mapping['items']['minecraft:leather_horse_armor']
 with zipfile.ZipFile(pack) as z:
     names = set(z.namelist())
     assert len(names) == len(z.namelist()), 'Duplicate ZIP entries'
     manifest = json.loads(z.read('manifest.json'))
-    assert manifest['header']['version'] == [2, 3, 1]
+    assert manifest['header']['version'] == [2, 3, 2]
     assert all(0 <= n < 100 for n in manifest['header']['version'])
+    actor = json.loads(z.read('entity/item_display.entity.json'))['minecraft:client_entity']['description']
+    assert actor['scripts']['animate'] == ['kcraft_stable']
+    animation = json.loads(z.read('animations/kcraft_display.animation.json'))['animations']['animation.kcraft.piano.display.stable']['bones']
+    assert all('* 1.6' in expr for expr in animation['geyser']['position'])
     geometries = {}
     for name in names:
         if name.startswith('models/') and name.endswith('.json'):
@@ -37,8 +41,39 @@ with zipfile.ZipFile(pack) as z:
             sound = sounds[f'kcraft:p{slot}.{note}']['sounds'][0]
             assert z.read(sound['name'] + '.ogg').startswith(b'OggS')
             checked += 1
+    # Compare actual source meshes and atlas alpha: opaque body panels must not vanish.
+    with zipfile.ZipFile(root / 'web/public/downloads/kcraft-piano-pack.zip') as java:
+        face_count = 0
+        for model in models:
+            name = model['model'].split(':')[1]
+            source = json.loads(java.read('assets/kcraft/models/' + name + '.json'))
+            attachable = json.loads(z.read('attachables/' + model['bedrock_identifier'].replace(':', '/') + '.json'))['minecraft:attachable']['description']
+            geometry = geometries[attachable['geometry']['default']]
+            cubes = [cube for bone in geometry['bones'] for cube in bone.get('cubes', [])]
+            assert len(cubes) == len(source['elements']), 'Model parts dropped: ' + name
+            atlas = Image.open(io.BytesIO(z.read(attachable['textures']['default'] + '.png'))).convert('RGBA')
+            for element, cube in zip(source['elements'], cubes):
+                for face, data in element['faces'].items():
+                    uv = data.get('uv')
+                    if uv is None:
+                        continue
+                    texture = source['textures'][data['texture'][1:]].split(':')[-1]
+                    image = Image.open(io.BytesIO(java.read('assets/minecraft/textures/' + texture + '.png'))).convert('RGBA')
+                    def alpha(image, u, v):
+                        return image.getpixel((max(0, min(image.width - 1, int(u))), max(0, min(image.height - 1, int(v)))))[3]
+                    expected = alpha(image, (uv[0]+uv[2])/32*image.width, (uv[1]+uv[3])/32*image.height)
+                    b = cube['uv'][face]
+                    actual = alpha(atlas, b['uv'][0]+b['uv_size'][0]/2, b['uv'][1]+b['uv_size'][1]/2)
+                    assert expected < 128 or actual >= 128, 'Opaque source face became transparent: ' + name
+                    face_count += 1
+    # The root pivot is 8px; y-offset=-.5 cancels its unscaled half block.
+    # Applying the pack's real expression must put the grand-piano feet at floor Y=0.
+    expr = animation['geyser']['position'][1].replace("q.property('geyser:t_y')", '9')
+    translation_pixels = eval(expr, {'__builtins__': {}}, {})
+    floor = -.5 + .5 + 1.8*(0/16-.5) + translation_pixels/16
+    assert abs(floor) < 1e-7, 'Piano feet must not sink below the Java floor'
     black = Image.open(io.BytesIO(z.read('textures/kcraft/piano/key_piano_black_key.png'))).convert('RGB')
     assert max(v[1] for v in black.getextrema()) <= 22, 'Black keys must not use an untinted white atlas'
     assert 'JW-Piano-license.txt' in names
 print(json.dumps({'models': len(models), 'soundMappings': checked, 'directDisplayBoneBinding': True,
-                  'blackKeyColorBaked': True, 'allReferencesExist': True, 'packVersion': [2, 3, 1]}))
+                  'blackKeyColorBaked': True, 'allReferencesExist': True, 'packVersion': [2, 3, 2], 'opaqueFacesChecked': face_count, 'grandPianoFeetY': floor, 'stablePoseOnly': True}))
