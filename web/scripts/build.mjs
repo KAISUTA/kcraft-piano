@@ -10,3 +10,4 @@ for(const [name,file]of[['@tonejs/midi','LICENSE.md'],['midi-file','LICENSE.md']
 await writeFile('public/app.js.LEGAL.txt',licenses);
 await writeFile('public/_headers',`/*\n  Referrer-Policy: no-referrer\n  X-Content-Type-Options: nosniff\n  Permissions-Policy: midi=(self)\n  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; media-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'\n/samples/*\n  Cache-Control: public, max-age=31536000, immutable\n/downloads/*\n  Cache-Control: public, max-age=3600\n`);
 console.log('Web build complete: 88 preloaded upstream piano samples.');
+await writeFile('public/_headers',(await readFile('public/_headers','utf8'))+'\n/\n  Cache-Control: no-cache\n/index.html\n  Cache-Control: no-cache\n/app.js\n  Cache-Control: no-cache\n');

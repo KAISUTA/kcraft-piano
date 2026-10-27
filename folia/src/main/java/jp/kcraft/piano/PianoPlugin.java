@@ -76,6 +76,9 @@ public final class PianoPlugin extends JavaPlugin implements Listener, CommandEx
             } catch (Exception e) { getLogger().warning("ピアノの読込失敗: " + name + ": " + e.getMessage()); }
         }
         getLogger().info("日本語Foliaランタイム起動。ピアノ数=" + pianos.size());
+        Bukkit.getAsyncScheduler().runAtFixedRate(this, task -> {
+            for(Session session:sessions.values())session.checkHealth();
+        },5,5,TimeUnit.SECONDS);
     }
     @Override public void onDisable() {
         running = false;
@@ -107,7 +110,8 @@ public final class PianoPlugin extends JavaPlugin implements Listener, CommandEx
         if(command.getName().equalsIgnoreCase("pianoadmin")){
             if(sender instanceof Player&&!sender.hasPermission("kcraft.piano.admin"))return true;
             if(args.length==2&&args[0].equals("pack")){Player target=players.values().stream().filter(p->p.getName().equalsIgnoreCase(args[1])).findFirst().orElse(null);if(target!=null)onPlayer(target,()->schedulePack(target));sender.sendMessage(target==null?"Player offline":"Pack refresh scheduled");}
-            else sender.sendMessage("READY version="+getPluginMeta().getVersion()+" audio="+(realtime==null?"fallback":"direct")+" pianos="+pianos.size()+" onlineSnapshots="+players.size()+" fixedBridges="+sessions.size()+" packsWaiting="+pendingPacks.size());
+            else {sender.sendMessage("READY version="+getPluginMeta().getVersion()+" audio="+(realtime==null?"fallback":"direct")+" pianos="+pianos.size()+" onlineSnapshots="+players.size()+" fixedBridges="+sessions.size()+" packsWaiting="+pendingPacks.size());
+                for(Session s:sessions.values())sender.sendMessage("BRIDGE piano="+s.piano.name+" open="+(s.socket!=null&&!s.socket.isInputClosed())+" replyAgeMs="+TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-s.lastReply)+" received="+s.receivedCount.get()+" notes="+s.noteCount.get());}
             return true;
         }
         if (!(sender instanceof Player player)) { sender.sendMessage("ゲーム内から実行してください。"); return true; }
@@ -360,6 +364,8 @@ public final class PianoPlugin extends JavaPlugin implements Listener, CommandEx
         final java.io.ByteArrayOutputStream fragments = new java.io.ByteArrayOutputStream(16);
         volatile WebSocket socket; volatile boolean closed;
         volatile long probeSent;
+        volatile long lastReply=System.nanoTime();
+        final AtomicInteger receivedCount=new AtomicInteger(),noteCount=new AtomicInteger();
         CompletableFuture<WebSocket> outgoing=CompletableFuture.completedFuture(null);
         final AtomicInteger outgoingCount=new AtomicInteger();
         Session(Piano piano) {this.piano=piano;try{token=Base64.getUrlEncoder().withoutPadding().encodeToString(java.security.MessageDigest.getInstance("SHA-256").digest(piano.name.getBytes(java.nio.charset.StandardCharsets.UTF_8)));}catch(java.security.NoSuchAlgorithmException e){throw new IllegalStateException(e);}}
@@ -371,12 +377,22 @@ public final class PianoPlugin extends JavaPlugin implements Listener, CommandEx
                 });
 
         }
-        public void onOpen(WebSocket ws) {
+        public synchronized void onOpen(WebSocket ws) {
             socket=ws;if(closed){ws.abort();return;} ws.request(1);
             // Warm the relay before the first MIDI note; serialize with later binary sends.
-            probeSent=System.nanoTime();outgoing=ws.sendText("ping",true);
+            lastReply=System.nanoTime();sendProbe();
         }
-        public CompletionStage<?> onText(WebSocket ws,CharSequence data,boolean last) { if(getConfig().getBoolean("latency-probe",false)&&last&&data.toString().equals("pong")&&probeSent!=0)getLogger().info("BRIDGE PROBE ms="+(System.nanoTime()-probeSent)/1_000_000d);ws.request(1);return null; }
+        synchronized void sendProbe(){
+            WebSocket ws=socket;if(closed||ws==null)return;
+            probeSent=System.nanoTime();outgoing=outgoing.thenCompose(ignored->closed?CompletableFuture.completedFuture(ws):ws.sendText("ping",true));
+            outgoing.whenComplete((ignored,error)->{if(error!=null)retry();});
+        }
+        void checkHealth(){
+            if(closed)return;
+            if(System.nanoTime()-lastReply>TimeUnit.SECONDS.toNanos(15)){getLogger().warning("BRIDGE timeout piano="+piano.name+"; reconnecting");retry();}
+            else sendProbe();
+        }
+        public CompletionStage<?> onText(WebSocket ws,CharSequence data,boolean last) { if(last&&data.toString().equals("pong")){lastReply=System.nanoTime();if(getConfig().getBoolean("latency-probe",false)&&probeSent!=0)getLogger().info("BRIDGE PROBE ms="+(lastReply-probeSent)/1_000_000d);}ws.request(1);return null; }
         public CompletionStage<?> onBinary(WebSocket ws,ByteBuffer data,boolean last) {
             int size=data.remaining();
             if(fragments.size()+size>16){close();return null;}
@@ -390,6 +406,7 @@ public final class PianoPlugin extends JavaPlugin implements Listener, CommandEx
             int type=Byte.toUnsignedInt(b.get()),note=Byte.toUnsignedInt(b.get()),vel=Byte.toUnsignedInt(b.get()),channel=Byte.toUnsignedInt(b.get());
             if(type>3||vel>127||channel>15||(type==0&&(note<21||note>108))||!Double.isFinite(b.getDouble(8)))return;
             long received=System.nanoTime();
+            lastReply=received;receivedCount.incrementAndGet();if(type==0&&vel>0)noteCount.incrementAndGet();
             if(realtime!=null){
                 realtime.handle(piano.voice,type,note,vel,piano.volume,null);
                 acknowledge(bytes,received);

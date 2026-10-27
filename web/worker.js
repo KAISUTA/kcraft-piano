@@ -33,6 +33,14 @@ export default {
 };
 export class PianoRoom extends DurableObject {
  constructor(ctx,env){super(ctx,env);this.env=env;this.attempts=new Map();}
+ liveBridges(id){
+  return this.ctx.getWebSockets(id?'bridge:'+id:'bridge').filter(ws=>{
+   if(ws.readyState!==1)return false;
+   const state=ws.deserializeAttachment();
+   if(!state.lastSeen||Date.now()-state.lastSeen>20000){ws.close(1012,'Minecraft heartbeat timeout');return false;}
+   return true;
+  });
+ }
  async fetch(request){
   const url=new URL(request.url);
   if(url.pathname==='/api/login'){
@@ -43,25 +51,28 @@ export class PianoRoom extends DurableObject {
    const expiry=String(now+30*86400000),signature=await sign(expiry,this.env.BRIDGE_SECRET);
    return Response.json({ok:true},{headers:{'Set-Cookie':`piano_access=${expiry}.${signature}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=2592000`,'Cache-Control':'no-store'}});
   }
-  if(url.pathname==='/api/pianos')return Response.json(this.ctx.getWebSockets('bridge').filter(ws=>ws.readyState===1).map(ws=>{const s=ws.deserializeAttachment();return{id:s.id,name:s.name};}).filter((s,i,a)=>a.findIndex(t=>t.id===s.id)===i),{headers:{'Cache-Control':'no-store'}});
+  if(url.pathname==='/api/pianos')return Response.json(this.liveBridges().map(ws=>{const s=ws.deserializeAttachment();return{id:s.id,name:s.name};}).filter((s,i,a)=>a.findIndex(t=>t.id===s.id)===i),{headers:{'Cache-Control':'no-store'}});
   const role=request.headers.get('X-Piano-Role'),id=request.headers.get('X-Piano-Id');
-  const bridges=this.ctx.getWebSockets('bridge:'+id).filter(ws=>ws.readyState===1);
+  const bridges=this.liveBridges(id);
   if(role==='play'&&!bridges.length)return new Response('ピアノが未接続です。少し待って再接続してください',{status:409});
   // A fixed URL can be reopened: newest authenticated connection takes control.
   const previous=this.ctx.getWebSockets(role+':'+id);
   if(role==='play'&&previous.length){const panic=new Uint8Array(16);panic[0]=2;for(const b of bridges)b.send(panic);}
   for(const ws of previous)ws.close(1000,'Reconnected');
   const pair=new WebSocketPair(),[client,server]=Object.values(pair);this.ctx.acceptWebSocket(server,[role,role+':'+id]);
-  server.serializeAttachment({role,id,name:decodeURIComponent(request.headers.get('X-Piano-Name')||'piano'),count:0});server.send(JSON.stringify({type:'ready',role}));return new Response(null,{status:101,webSocket:client});
+  server.serializeAttachment({role,id,name:decodeURIComponent(request.headers.get('X-Piano-Name')||'piano'),count:0,lastSeen:Date.now()});server.send(JSON.stringify({type:'ready',role}));return new Response(null,{status:101,webSocket:client});
  }
  webSocketMessage(ws,data){
   const state=ws.deserializeAttachment();if(ws.readyState!==1)return;
-  if(typeof data==='string'){if(data==='ping')ws.send('pong');else ws.close(1008,'Binary packets only');return;}
+  if(typeof data==='string'){if(data==='ping'){state.lastSeen=Date.now();ws.serializeAttachment(state);ws.send('pong');}else ws.close(1008,'Binary packets only');return;}
   if(state.role==='play'){
    if(!validPacket(data)){ws.close(1008,'Invalid MIDI packet');return;}
    const now=Date.now();if(now-(state.window||0)>1000){state.window=now;state.count=0;}if(++state.count>1000){ws.close(1008,'Rate limit');return;}ws.serializeAttachment(state);
   }else if(!(data instanceof ArrayBuffer)||data.byteLength!==24){ws.close(1008,'Invalid acknowledgement');return;}
-  for(const peer of this.ctx.getWebSockets((state.role==='play'?'bridge:':'play:')+state.id))if(peer.readyState===1)peer.send(data);
+  else {state.lastSeen=Date.now();ws.serializeAttachment(state);}
+  const peers=state.role==='play'?this.liveBridges(state.id):this.ctx.getWebSockets('play:'+state.id);
+  if(state.role==='play'&&!peers.length){ws.close(1012,'Minecraft reconnecting');return;}
+  for(const peer of peers)if(peer.readyState===1)peer.send(data);
  }
  webSocketClose(ws,code,reason){
   const state=ws.deserializeAttachment();

@@ -1,0 +1,64 @@
+{
+  "timestamp": "2026-10-27T07:38:46.983Z",
+  "minecraft": "Folia 26.2",
+  "acks": 101,
+  "roundTripMs": {
+    "count": 101,
+    "min": 17.460799999998926,
+    "p50": 20.443900000000212,
+    "p95": 25.538500000000568,
+    "max": 26.604800000000978
+  },
+  "serverDispatchMs": {
+    "count": 101,
+    "min": 0.001152,
+    "p50": 0.029158,
+    "p95": 0.149062,
+    "max": 2.333492
+  },
+  "packets": {
+    "entity_status": 1,
+    "entity_metadata": 1186,
+    "entity_update_attributes": 291,
+    "spawn_entity": 381,
+    "sync_entity_position": 1080,
+    "sound_effect": 137,
+    "entity_velocity": 2064,
+    "rel_entity_move": 2742,
+    "entity_head_rotation": 380,
+    "entity_equipment": 18,
+    "entity_move_look": 128,
+    "entity_look": 78,
+    "stop_sound": 40,
+    "entity_destroy": 16
+  },
+  "observerSoundPackets": 138,
+  "observerSoundPacketNames": [
+    "sound_effect",
+    "stop_sound"
+  ],
+  "customPianoNoteOns": 40,
+  "customPianoStops": 40,
+  "performerNoteOns": 40,
+  "performerStops": 40,
+  "shortNoteRisingKeys": 5,
+  "burstAcknowledged": 500,
+  "risingKeys": 173,
+  "risingKeysCleaned": 173,
+  "benchSeated": true,
+  "productionVersion": "2.4.1",
+  "productionJarSha256": "1b072dd66b60cd8b47a37d73f495f22678c90d970f449091772d856cfb0aae50",
+  "workerVersion": "f8c2a70f-2f38-445d-b926-a4db679d8b55",
+  "productionBefore": {
+    "webSocketOpen": true,
+    "minecraftHeartbeatReplies": 0
+  },
+  "productionAfter": {
+    "browserRoundTripMs": 20.0,
+    "receivedPackets": 22,
+    "noteOns": 1,
+    "replyAgeMs": 780,
+    "backendRestartedByThisFix": false
+  },
+  "physicalAudioVerified": false
+}

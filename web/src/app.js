@@ -47,7 +47,7 @@ function soundOn(n,velocity){
 }
 function release(v,time=.065){if(v.released)return;v.released=true;v.gain.gain.cancelScheduledValues(audio.currentTime);v.gain.gain.setTargetAtTime(0,audio.currentTime,time/4);v.source.stop(audio.currentTime+time);}
 function transmit(type,n=0,vel=0,ch=0){
-  if(!connected||socket?.readyState!==WebSocket.OPEN)return;
+  if(socket?.readyState!==WebSocket.OPEN)return;
   if(socket.bufferedAmount>16384){socket.close(1000,'通信が混雑しています');return;}
   const packet=new ArrayBuffer(16),d=new DataView(packet);d.setUint8(0,type);d.setUint8(1,n);d.setUint8(2,vel);d.setUint8(3,ch);d.setUint32(4,++sequence,true);d.setFloat64(8,performance.now(),true);socket.send(packet);
 }
@@ -108,8 +108,9 @@ function connect(){
  if(!selectedPiano||shuttingDown)return;
  clearTimeout(retryTimer);const old=socket;if(old){old.onclose=null;old.onerror=null;panic();old.close(1000,'Switching piano');}clearInterval(heartbeat);connected=false;
  const current=new WebSocket(`${location.protocol==='https:'?'wss:':'ws:'}//${location.host}/play/${selectedPiano.id}`);socket=current;current.binaryType='arraybuffer';$('connection').textContent='Minecraft 接続中';
- current.onopen=()=>{if(socket!==current)return;connected=true;reconnecting=false;$('connection').textContent='Minecraft 接続済み';$('connection-dot').className='on';heartbeat=setInterval(()=>transmit(3),2000);transmit(3);};
- current.onmessage=e=>{if(typeof e.data==='string')return;if(e.data.byteLength!==24)return;const d=new DataView(e.data);rtts.push(performance.now()-d.getFloat64(8,true));serverTimes.push(d.getFloat64(16,true));if(rtts.length>100){rtts.shift();serverTimes.shift();}$('rtt').textContent=percentile(rtts,.5).toFixed(1);$('server-latency').textContent=percentile(serverTimes,.5).toFixed(1);$('measurement-state').textContent=`直近${rtts.length}件 · 中央値`;};
+ let lastReply=performance.now();
+ current.onopen=()=>{if(socket!==current)return;reconnecting=false;lastReply=performance.now();$('connection').textContent='Minecraft 応答確認中';$('connection-dot').className='';$('rtt').textContent='—';$('server-latency').textContent='—';rtts.length=0;serverTimes.length=0;heartbeat=setInterval(()=>{if(performance.now()-lastReply>8000){connected=false;$('connection').textContent='Minecraft 応答なし・再接続中';current.close(1000,'Minecraft response timeout');return;}transmit(3);},2000);transmit(3);};
+ current.onmessage=e=>{if(socket!==current||typeof e.data==='string'||e.data.byteLength!==24)return;lastReply=performance.now();connected=true;$('connection').textContent='Minecraft 接続済み';$('connection-dot').className='on';const d=new DataView(e.data);rtts.push(performance.now()-d.getFloat64(8,true));serverTimes.push(d.getFloat64(16,true));if(rtts.length>100){rtts.shift();serverTimes.shift();}$('rtt').textContent=percentile(rtts,.5).toFixed(1);$('server-latency').textContent=percentile(serverTimes,.5).toFixed(1);$('measurement-state').textContent=`直近${rtts.length}件 · 中央値`;};
  current.onclose=e=>{if(socket!==current)return;connected=false;clearInterval(heartbeat);panic();$('connection-dot').className='';$('connection').textContent='Minecraft 再接続中';if(e.reason==='Reconnected'){status('別のページから同じピアノへ接続されました。「再接続」で操作を戻せます。');return;}if(!shuttingDown)retryTimer=setTimeout(()=>void loadPianos().catch(()=>{retryTimer=setTimeout(connect,3000);}),2000);};
  current.onerror=()=>{$('login-status').textContent='Minecraftへ再接続しています。固定URLを開いたままで待てます。';};
 }
