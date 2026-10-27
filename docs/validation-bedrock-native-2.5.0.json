@@ -1,0 +1,43 @@
+{
+  "nativeVariants": [
+    7,
+    2,
+    4,
+    1,
+    6,
+    5
+  ],
+  "nativeDisplayCount": 367,
+  "attachablesDisabledForNative": true,
+  "archiveDownloadedAndHashMatched": true,
+  "trails": 6,
+  "holdDurationsMs": [
+    100,
+    800,
+    200,
+    100,
+    400,
+    200
+  ],
+  "panicReleasesHeldTrail": true,
+  "peakLengths": [
+    0.21534602344036102,
+    1.5390715599060059,
+    0.4193977415561676,
+    0.22519241273403168,
+    0.7909983396530151,
+    0.44939056038856506
+  ],
+  "pedalIndependent": true,
+  "allRemoved": true,
+  "flightOrientationFixed": true,
+  "bedrockVersion": "1.26.51",
+  "privateProxySameGeyserBuild": true,
+  "packOfferCount": 2,
+  "pianoDisplays": 366,
+  "displayEquipment": 564,
+  "customModelsEquipped": [],
+  "noteOns": 6,
+  "noteOffs": 6,
+  "renderedOnPhysicalDevice": false
+}

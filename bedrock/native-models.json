@@ -1,0 +1,19 @@
+{
+  "uuid": "482a7774-563d-5881-862a-de3aa447e944",
+  "version": [
+    2,
+    5,
+    0
+  ],
+  "models": [
+    "bench",
+    "key_piano_black_key",
+    "key_piano_black_key_down",
+    "key_piano_key",
+    "key_piano_key_down",
+    "piano_electric_piano",
+    "piano_grand_piano",
+    "piano_grand_piano_close",
+    "piano_up_right_piano_close"
+  ]
+}

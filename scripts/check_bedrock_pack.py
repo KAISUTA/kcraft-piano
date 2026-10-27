@@ -2,28 +2,40 @@
 import io
 import json
 import pathlib
+import re
 import zipfile
 from PIL import Image
 
 root = pathlib.Path(__file__).resolve().parents[1]
-pack = root / 'web/public/downloads/kcraft-piano-bedrock-2.3.2.mcpack'
+pack = root / 'web/public/downloads/kcraft-piano-bedrock-2.5.0.mcpack'
 mapping = json.loads((root / 'bedrock/kcraft-piano-items.json').read_text(encoding='utf-8'))
 models = mapping['items']['minecraft:leather_horse_armor']
 with zipfile.ZipFile(pack) as z:
     names = set(z.namelist())
     assert len(names) == len(z.namelist()), 'Duplicate ZIP entries'
     manifest = json.loads(z.read('manifest.json'))
-    assert manifest['header']['version'] == [2, 3, 2]
+    assert manifest['header']['version'] == [2, 5, 0]
     assert all(0 <= n < 100 for n in manifest['header']['version'])
     actor = json.loads(z.read('entity/item_display.entity.json'))['minecraft:client_entity']['description']
     assert actor['scripts']['animate'] == ['kcraft_stable']
     animation = json.loads(z.read('animations/kcraft_display.animation.json'))['animations']['animation.kcraft.piano.display.stable']['bones']
     assert all('* 1.6' in expr for expr in animation['geyser']['position'])
+    assert actor['render_controllers'] == ['controller.render.kcraft.native_piano']
+    controller=json.loads(z.read('render_controllers/kcraft_native.render_controllers.json'))['render_controllers']['controller.render.kcraft.native_piano']
+    assert len(controller['arrays']['geometries']['Array.kcraft_models']) == 10
+    assert animation['geyser']['position'][0].startswith('-')
     geometries = {}
     for name in names:
         if name.startswith('models/') and name.endswith('.json'):
             for geometry in json.loads(z.read(name))['minecraft:geometry']:
                 geometries[geometry['description']['identifier']] = geometry
+    native_models = json.loads((root/'bedrock/native-models.json').read_text(encoding='utf-8'))['models']
+    extension_source=(root/'bedrock/extension-src/ItemDisplayEntity.java').read_text(encoding='utf-8')
+    extension_models=re.findall(r'"([^"]+)"',re.search(r'NATIVE_PIANO_MODELS = List.of\(([^;]+)\)',extension_source).group(1))
+    assert extension_models == native_models
+    for index,identifier in enumerate(native_models,1):
+        assert controller['arrays']['geometries']['Array.kcraft_models'][index] == 'Geometry.native_'+identifier
+        assert actor['geometry']['native_'+identifier] in geometries
     for model in models:
         assert model['type'] == 'definition' and model['model'].startswith('kcraft:')
         identifier = model['bedrock_identifier']
@@ -32,7 +44,10 @@ with zipfile.ZipFile(pack) as z:
         assert 'scripts' not in attachable and 'animations' not in attachable
         assert attachable['textures']['default'] + '.png' in names
         geometry = geometries[attachable['geometry']['default']]
-        assert any(b.get('binding') == "'geyser_z'" and b['pivot'] == [0, 8, 0] for b in geometry['bones'])
+        if identifier.split(':')[1] in native_models:
+            assert geometry['bones'][0]['name'] == 'geyser' and all('binding' not in b for b in geometry['bones'])
+        else:
+            assert any(b.get('binding') == "'geyser_z'" and b['pivot'] == [0, 8, 0] for b in geometry['bones'])
         assert any(b.get('cubes') for b in geometry['bones'])
     sounds = json.loads(z.read('sounds/sound_definitions.json'))['sound_definitions']
     checked = 0
@@ -75,5 +90,5 @@ with zipfile.ZipFile(pack) as z:
     black = Image.open(io.BytesIO(z.read('textures/kcraft/piano/key_piano_black_key.png'))).convert('RGB')
     assert max(v[1] for v in black.getextrema()) <= 22, 'Black keys must not use an untinted white atlas'
     assert 'JW-Piano-license.txt' in names
-print(json.dumps({'models': len(models), 'soundMappings': checked, 'directDisplayBoneBinding': True,
-                  'blackKeyColorBaked': True, 'allReferencesExist': True, 'packVersion': [2, 3, 2], 'opaqueFacesChecked': face_count, 'grandPianoFeetY': floor, 'stablePoseOnly': True}))
+print(json.dumps({'models': len(models), 'soundMappings': checked, 'nativeEntityMeshes': 9,
+                  'blackKeyColorBaked': True, 'allReferencesExist': True, 'packVersion': [2, 5, 0], 'opaqueFacesChecked': face_count, 'grandPianoFeetY': floor, 'stablePoseOnly': True}))
